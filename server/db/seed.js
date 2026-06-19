@@ -19,11 +19,6 @@ const BRANDS = [
   { name_en: 'Generic', name_ar: 'غير محدد' },
 ];
 
-const SERVICE_TYPES = [
-  { name_en: 'Phone Repair', name_ar: 'صيانة هاتف', default_fee: 0, consumes_parts: 1 },
-  { name_en: 'Bill Payment', name_ar: 'دفع فواتير', default_fee: 5, consumes_parts: 0 },
-  { name_en: 'Mobile Recharge', name_ar: 'شحن رصيد', default_fee: 2, consumes_parts: 0 },
-];
 
 /** Inserts default reference data. Idempotent: skips when data already exists. */
 export function seed() {
@@ -43,7 +38,6 @@ export function seed() {
 
   seedTable('categories', CATEGORIES, ['name_en', 'name_ar']);
   seedTable('brands', BRANDS, ['name_en', 'name_ar']);
-  seedTable('service_types', SERVICE_TYPES, ['name_en', 'name_ar', 'default_fee', 'consumes_parts']);
 
   // Guarantee a protected "Generic" category and brand always exist (even after a
   // reset / if the user deleted everything) so products always have a fallback that
@@ -59,6 +53,43 @@ export function seed() {
   };
   ensureProtected('categories', { name_en: 'Generic', name_ar: 'عام' });
   ensureProtected('brands', { name_en: 'Generic', name_ar: 'غير محدد' });
+
+  // Services module seed (new model). Idempotent: only when there are no services yet.
+  if (db.prepare('SELECT COUNT(*) AS c FROM services').get().c === 0) {
+    const providers = db
+      .prepare('INSERT INTO option_lists (name_en, name_ar, options) VALUES (?, ?, ?)')
+      .run('Providers', 'المزودون', JSON.stringify(['Vodafone', 'WE', 'Orange', 'E&']));
+    const providersId = providers.lastInsertRowid;
+
+    const insertService = db.prepare(
+      'INSERT INTO services (name_en, name_ar, fields, sort_order) VALUES (?, ?, ?, ?)',
+    );
+    const topupId = insertService.run(
+      'Top-up',
+      'شحن',
+      JSON.stringify([
+        { key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'select', required: true, option_list_id: providersId },
+        { key: 'type', label_en: 'Type', label_ar: 'النوع', type: 'select', required: true, options: ['شحن', 'كارت فكة', 'أخرى'] },
+      ]),
+      1,
+    ).lastInsertRowid;
+    insertService.run(
+      'Bill Payment',
+      'دفع فواتير',
+      JSON.stringify([
+        { key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'select', required: false, option_list_id: providersId },
+      ]),
+      2,
+    );
+    insertService.run('Maintenance', 'صيانة', JSON.stringify([]), 3);
+
+    const insertShortcut = db.prepare(
+      'INSERT INTO service_shortcuts (service_id, label_en, label_ar, color, sort_order, preset_values) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+    insertShortcut.run(topupId, 'Vodafone شحن', 'فودافون شحن', 'red', 1, JSON.stringify({ provider: 'Vodafone', type: 'شحن' }));
+    insertShortcut.run(topupId, 'Orange شحن', 'أورنج شحن', 'orange', 2, JSON.stringify({ provider: 'Orange', type: 'شحن' }));
+    insertShortcut.run(topupId, 'WE شحن', 'وي شحن', 'grape', 3, JSON.stringify({ provider: 'WE', type: 'شحن' }));
+  }
 
   // Ensure the single settings row exists.
   const hasSettings = db.prepare('SELECT COUNT(*) AS c FROM settings').get().c;

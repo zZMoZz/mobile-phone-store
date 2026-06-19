@@ -60,4 +60,17 @@ describe('services backend', () => {
       });
     expect(res.status).toBe(400);
   });
+
+  it('seeds default services and a Providers option list', async () => {
+    const services = await request(app).get('/api/services');
+    expect(services.body.map((s) => s.name_en)).toEqual(expect.arrayContaining(['Top-up', 'Bill Payment', 'Maintenance']));
+
+    const lists = await request(app).get('/api/option-lists');
+    const providers = lists.body.find((l) => l.name_en === 'Providers');
+    expect(providers).toBeDefined();
+    expect(providers.options).toEqual(expect.arrayContaining(['Vodafone', 'WE', 'Orange', 'E&']));
+
+    const shortcuts = await request(app).get('/api/service-shortcuts');
+    expect(shortcuts.body.length).toBeGreaterThan(0);
+  });
 });
