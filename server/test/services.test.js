@@ -22,4 +22,42 @@ describe('services backend', () => {
     const txnCols = db.prepare('PRAGMA table_info(transactions)').all().map((c) => c.name);
     expect(txnCols).toEqual(expect.arrayContaining(['service_id', 'service_data']));
   });
+
+  it('creates a service with validated fields', async () => {
+    const res = await request(app)
+      .post('/api/services')
+      .send({
+        name_en: 'Top-up',
+        name_ar: 'شحن',
+        fields: [
+          { key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'select', required: true, options: ['Vodafone', 'WE'] },
+          { key: 'note', label_en: 'Note', label_ar: 'ملاحظة', type: 'text', required: false },
+        ],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.fields).toHaveLength(2);
+    expect(res.body.fields[0].type).toBe('select');
+    expect(res.body.fields[0].options).toEqual(['Vodafone', 'WE']);
+  });
+
+  it('rejects an invalid field type', async () => {
+    const res = await request(app)
+      .post('/api/services')
+      .send({ name_en: 'Bad', name_ar: 'سيئ', fields: [{ key: 'x', label_en: 'X', label_ar: 'س', type: 'date' }] });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects duplicate field keys', async () => {
+    const res = await request(app)
+      .post('/api/services')
+      .send({
+        name_en: 'Dup',
+        name_ar: 'مكرر',
+        fields: [
+          { key: 'a', label_en: 'A', label_ar: 'أ', type: 'text' },
+          { key: 'a', label_en: 'A2', label_ar: 'أ٢', type: 'text' },
+        ],
+      });
+    expect(res.status).toBe(400);
+  });
 });
