@@ -73,22 +73,48 @@ describe('transactions API', () => {
     expect(res.body.profit).toBe(300); // 800 - 500
   });
 
-  it('records a service with a fee and parts consumed from stock', async () => {
-    const part = await createProduct({ name: 'Screen', buying_price: 200, selling_price: 350, quantity: 4 });
+  it('records a pure-revenue service transaction (total = cost, no profit)', async () => {
+    const svc = await request(app)
+      .post('/api/services')
+      .send({
+        name_en: 'Top-up',
+        name_ar: 'شحن',
+        fields: [{ key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'text', required: true }],
+      });
     const res = await request(app)
       .post('/api/transactions')
-      .send({
-        type: 'service',
-        fee: 100,
-        items: [{ product_id: part.id, quantity: 1, unit_price: 350 }],
-      });
+      .send({ type: 'service', service_id: svc.body.id, cost: 100, field_values: { provider: 'Vodafone' } });
     expect(res.status).toBe(201);
-    expect(res.body.total).toBe(450); // fee 100 + part 350
-    expect(res.body.cost_total).toBe(200); // part cost
-    expect(res.body.profit).toBe(250); // 450 - 200
+    expect(res.body.total).toBe(100);
+    expect(res.body.profit).toBe(0);
+    expect(res.body.cost_total).toBe(0);
+    expect(res.body.service_id).toBe(svc.body.id);
+    expect(res.body.service_data.cost).toBe(100);
+    expect(res.body.service_data.fields).toEqual([
+      { label_en: 'Provider', label_ar: 'المزود', value: 'Vodafone' },
+    ]);
+  });
 
-    const after = await getProduct(part.id);
-    expect(after.quantity).toBe(3); // 4 - 1
+  it('rejects a service transaction missing a required field', async () => {
+    const svc = await request(app)
+      .post('/api/services')
+      .send({
+        name_en: 'Bill',
+        name_ar: 'فاتورة',
+        fields: [{ key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'text', required: true }],
+      });
+    const res = await request(app)
+      .post('/api/transactions')
+      .send({ type: 'service', service_id: svc.body.id, cost: 50, field_values: {} });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a service transaction with non-positive cost', async () => {
+    const svc = await request(app).post('/api/services').send({ name_en: 'Maint', name_ar: 'صيانة', fields: [] });
+    const res = await request(app)
+      .post('/api/transactions')
+      .send({ type: 'service', service_id: svc.body.id, cost: 0 });
+    expect(res.status).toBe(400);
   });
 
   it('lists transactions and fetches one with items', async () => {
