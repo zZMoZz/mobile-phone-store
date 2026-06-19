@@ -40,17 +40,16 @@ export function overview(query = {}) {
       totals.purchases += r.total;
     } else if (r.type === 'service') {
       totals.services += r.total;
-      totals.profit += r.profit;
     }
   }
 
-  // Trend buckets (sales + profit from sales & services).
+  // Trend buckets (sales + profit from product sales only).
   const fmt = query.granularity === 'month' ? '%Y-%m' : '%Y-%m-%d';
   const trend = db
     .prepare(
       `SELECT strftime('${fmt}', created_at) AS bucket,
-              COALESCE(SUM(CASE WHEN type IN ('sale','service') THEN total ELSE 0 END), 0) AS sales,
-              COALESCE(SUM(CASE WHEN type IN ('sale','service') THEN profit ELSE 0 END), 0) AS profit
+              COALESCE(SUM(CASE WHEN type = 'sale' THEN total ELSE 0 END), 0) AS sales,
+              COALESCE(SUM(CASE WHEN type = 'sale' THEN profit ELSE 0 END), 0) AS profit
        FROM transactions ${whereSql}
        GROUP BY bucket ORDER BY bucket`,
     )
