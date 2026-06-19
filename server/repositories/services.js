@@ -30,6 +30,9 @@ function normalizeFields(fields) {
       } else {
         out.options = Array.isArray(f.options) ? f.options.map((s) => String(s).trim()).filter(Boolean) : [];
       }
+      if (out.option_list_id == null && (!out.options || out.options.length === 0)) {
+        fail(400, 'A select field needs an option list or inline options', 'service_field_options_required');
+      }
     }
     return out;
   });

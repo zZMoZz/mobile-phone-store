@@ -113,6 +113,7 @@ describe('analytics, settings, and data export', () => {
     const before = await request(app).get('/api/analytics');
     const profitBefore = before.body.totals.profit;
     const servicesBefore = before.body.totals.services;
+    const trendSalesBefore = before.body.trend.reduce((s, b) => s + b.sales, 0);
 
     await request(app)
       .post('/api/transactions')
@@ -121,5 +122,7 @@ describe('analytics, settings, and data export', () => {
     const after = await request(app).get('/api/analytics');
     expect(after.body.totals.services).toBe(servicesBefore + 250); // revenue counted
     expect(after.body.totals.profit).toBe(profitBefore); // profit unchanged
+    const trendSalesAfter = after.body.trend.reduce((s, b) => s + b.sales, 0);
+    expect(trendSalesAfter).toBe(trendSalesBefore); // service revenue is NOT in the trend
   });
 });

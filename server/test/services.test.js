@@ -61,6 +61,13 @@ describe('services backend', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects a select field with neither an option list nor inline options', async () => {
+    const res = await request(app)
+      .post('/api/services')
+      .send({ name_en: 'NoOpts', name_ar: 'بدون', fields: [{ key: 's', label_en: 'S', label_ar: 'س', type: 'select' }] });
+    expect(res.status).toBe(400);
+  });
+
   it('seeds default services and a Providers option list', async () => {
     const services = await request(app).get('/api/services');
     expect(services.body.map((s) => s.name_en)).toEqual(expect.arrayContaining(['Top-up', 'Bill Payment', 'Maintenance']));
