@@ -1,0 +1,31 @@
+{
+  "name": "mobile-phone-store",
+  "version": "1.0.0",
+  "description": "Internal management web app for a mobile phone store (inventory + transactions + services).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "migrate": "node server/db/migrate.js",
+    "seed": "node server/db/seed.js",
+    "seed:demo": "node server/db/seed-demo.js",
+    "server": "node server/index.js",
+    "server:dev": "node --watch server/index.js",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently -n server,client -c blue,green \"npm run server:dev\" \"npm run client\"",
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "start": "node server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "multer": "^2.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.1"
+  }
+}
