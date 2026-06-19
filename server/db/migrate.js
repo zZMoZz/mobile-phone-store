@@ -43,6 +43,15 @@ function applyColumnMigrations(db) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN is_protected INTEGER NOT NULL DEFAULT 0`);
     }
   }
+
+  // Transactions: service redesign columns.
+  const txnCols = columns('transactions');
+  if (!txnCols.includes('service_id')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN service_id INTEGER REFERENCES services(id) ON DELETE SET NULL');
+  }
+  if (!txnCols.includes('service_data')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN service_data TEXT');
+  }
 }
 
 // Allow running directly: `node server/db/migrate.js`
