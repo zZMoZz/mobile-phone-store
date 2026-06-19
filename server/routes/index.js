@@ -8,6 +8,7 @@ import dataRouter from './data.js';
 import { categoriesRouter, brandsRouter } from './reference.js';
 import optionListsRouter from './optionLists.js';
 import servicesRouter from './services.js';
+import serviceShortcutsRouter from './serviceShortcuts.js';
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.use('/categories', categoriesRouter);
 router.use('/brands', brandsRouter);
 router.use('/option-lists', optionListsRouter);
 router.use('/services', servicesRouter);
+router.use('/service-shortcuts', serviceShortcutsRouter);
 router.use('/', dataRouter); // /backup, /export/*.csv
 
 export default router;
