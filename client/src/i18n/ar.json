@@ -253,7 +253,16 @@
     "backToServices": "العودة للخدمات",
     "fieldCount": "حقول",
     "deleteConfirm": "حذف هذه الخدمة؟",
-    "selectNeedsOptions": "حقل القائمة يحتاج قائمة مشتركة أو خيارًا واحدًا على الأقل"
+    "selectNeedsOptions": "حقل القائمة يحتاج قائمة مشتركة أو خيارًا واحدًا على الأقل",
+    "shortcuts": "الاختصارات",
+    "addShortcut": "إضافة اختصار",
+    "newShortcut": "اختصار جديد",
+    "editShortcut": "تعديل الاختصار",
+    "color": "اللون",
+    "presetValues": "القيم المسبقة",
+    "presetCost": "التكلفة المسبقة",
+    "noShortcuts": "لا توجد اختصارات بعد",
+    "deleteShortcutConfirm": "حذف هذا الاختصار؟"
   },
   "settings": {
     "title": "الإعدادات",

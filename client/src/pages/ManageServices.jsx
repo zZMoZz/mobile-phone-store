@@ -16,16 +16,22 @@ import {
   SegmentedControl,
   Center,
   Divider,
+  ColorInput,
+  NumberInput,
+  Badge,
+  ColorSwatch,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconEdit, IconTrash, IconArrowLeft } from '@tabler/icons-react';
+import { IconPlus, IconEdit, IconTrash, IconArrowLeft, IconBolt } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { listServices, createService, updateService, deleteService } from '../api/services.js';
 import { listOptionLists } from '../api/optionLists.js';
+import { listServiceShortcuts, createServiceShortcut, updateServiceShortcut, deleteServiceShortcut } from '../api/serviceShortcuts.js';
 import { apiErrorMessage } from '../lib/apiError.js';
+import { ServiceFieldInput } from '../components/ServiceFieldInputs.jsx';
 
 const BLANK_FIELD = () => ({
   _uid: crypto.randomUUID(),
@@ -40,6 +46,11 @@ const BLANK_FIELD = () => ({
   options: [],
 });
 
+const COLOR_SWATCHES = [
+  '#2196f3', '#4caf50', '#f44336', '#ff9800', '#9c27b0',
+  '#00bcd4', '#795548', '#607d8b', '#e91e63', '#ffeb3b',
+];
+
 export default function ManageServices() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -50,6 +61,31 @@ export default function ManageServices() {
   const [editing, setEditing] = useState(null);
   const [opened, handlers] = useDisclosure(false);
   const [saving, setSaving] = useState(false);
+
+  // Shortcuts modal state
+  const [shortcutsService, setShortcutsService] = useState(null);
+  const [shortcuts, setShortcuts] = useState([]);
+  const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
+  const [shortcutsLoading, setShortcutsLoading] = useState(false);
+
+  // Shortcut editor state (nested modal)
+  const [editingShortcut, setEditingShortcut] = useState(null);
+  const [shortcutEditorOpened, shortcutEditorHandlers] = useDisclosure(false);
+  const [shortcutSaving, setShortcutSaving] = useState(false);
+  const [presetValues, setPresetValues] = useState({});
+  const [presetCost, setPresetCost] = useState('');
+
+  const shortcutForm = useForm({
+    initialValues: {
+      label_en: '',
+      label_ar: '',
+      color: '',
+    },
+    validate: {
+      label_en: (v) => (v.trim() ? null : t('lists.nameRequired')),
+      label_ar: (v) => (v.trim() ? null : t('lists.nameRequired')),
+    },
+  });
 
   const form = useForm({
     initialValues: {
@@ -147,7 +183,6 @@ export default function ManageServices() {
   };
 
   const handleDelete = async (svc) => {
-    const name = lang === 'ar' ? svc.name_ar : svc.name_en;
     if (!window.confirm(t('manageServices.deleteConfirm'))) return;
     try {
       await deleteService(svc.id);
@@ -157,6 +192,97 @@ export default function ManageServices() {
       notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
     }
   };
+
+  // ── Shortcuts ──────────────────────────────────────────────────────────────
+
+  const loadShortcuts = async (serviceId) => {
+    setShortcutsLoading(true);
+    try {
+      const data = await listServiceShortcuts(serviceId);
+      setShortcuts(data);
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setShortcutsLoading(false);
+    }
+  };
+
+  const openShortcuts = (svc) => {
+    setShortcutsService(svc);
+    setShortcuts([]);
+    shortcutsHandlers.open();
+    loadShortcuts(svc.id);
+  };
+
+  const openNewShortcut = () => {
+    setEditingShortcut(null);
+    shortcutForm.setValues({ label_en: '', label_ar: '', color: '' });
+    setPresetValues({});
+    setPresetCost('');
+    shortcutEditorHandlers.open();
+  };
+
+  const openEditShortcut = (sc) => {
+    setEditingShortcut(sc);
+    const { cost, ...fieldPresets } = sc.preset_values || {};
+    shortcutForm.setValues({
+      label_en: sc.label_en || '',
+      label_ar: sc.label_ar || '',
+      color: sc.color || '',
+    });
+    setPresetValues(fieldPresets);
+    setPresetCost(cost != null ? cost : '');
+    shortcutEditorHandlers.open();
+  };
+
+  const submitShortcut = async (values) => {
+    setShortcutSaving(true);
+    try {
+      // Build preset_values: only include non-empty field values + cost if set
+      const pv = {};
+      for (const [key, val] of Object.entries(presetValues)) {
+        if (val !== '' && val != null) pv[key] = val;
+      }
+      if (presetCost !== '' && presetCost != null && !Number.isNaN(Number(presetCost))) {
+        pv.cost = Number(presetCost);
+      }
+
+      const payload = {
+        service_id: shortcutsService.id,
+        label_en: values.label_en,
+        label_ar: values.label_ar,
+        color: values.color || null,
+        preset_values: pv,
+      };
+
+      if (editingShortcut) {
+        await updateServiceShortcut(editingShortcut.id, payload);
+      } else {
+        await createServiceShortcut(payload);
+      }
+
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      shortcutEditorHandlers.close();
+      loadShortcuts(shortcutsService.id);
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setShortcutSaving(false);
+    }
+  };
+
+  const handleDeleteShortcut = async (sc) => {
+    if (!window.confirm(t('manageServices.deleteShortcutConfirm'))) return;
+    try {
+      await deleteServiceShortcut(sc.id);
+      notifications.show({ message: t('common.deleted'), color: 'green' });
+      loadShortcuts(shortcutsService.id);
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    }
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const localizedName = (svc) => (lang === 'ar' ? svc.name_ar : svc.name_en);
 
@@ -175,6 +301,8 @@ export default function ManageServices() {
     { value: 'shared', label: t('manageServices.sharedList') },
     { value: 'inline', label: t('manageServices.inlineOptions') },
   ];
+
+  const serviceFields = shortcutsService ? (shortcutsService.fields || []) : [];
 
   return (
     <Stack>
@@ -212,6 +340,14 @@ export default function ManageServices() {
                 </Table.Td>
                 <Table.Td>
                   <Group gap={4} wrap="nowrap">
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      leftSection={<IconBolt size={14} />}
+                      onClick={() => openShortcuts(svc)}
+                    >
+                      {t('manageServices.shortcuts')}
+                    </Button>
                     <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
                       <IconEdit size={16} />
                     </ActionIcon>
@@ -235,6 +371,7 @@ export default function ManageServices() {
         </Table>
       </Paper>
 
+      {/* ── Service edit modal ─────────────────────────────────────────────── */}
       <Modal
         opened={opened}
         onClose={handlers.close}
@@ -364,6 +501,153 @@ export default function ManageServices() {
               {t('common.cancel')}
             </Button>
             <Button type="submit" loading={saving}>
+              {t('common.save')}
+            </Button>
+          </Group>
+        </form>
+      </Modal>
+
+      {/* ── Shortcuts list modal ───────────────────────────────────────────── */}
+      <Modal
+        opened={shortcutsOpened}
+        onClose={shortcutsHandlers.close}
+        title={
+          shortcutsService
+            ? `${t('manageServices.shortcuts')} — ${localizedName(shortcutsService)}`
+            : t('manageServices.shortcuts')
+        }
+        size="lg"
+      >
+        <Stack>
+          <Group justify="flex-end">
+            <Button
+              size="xs"
+              leftSection={<IconPlus size={14} />}
+              onClick={openNewShortcut}
+            >
+              {t('manageServices.addShortcut')}
+            </Button>
+          </Group>
+
+          {shortcutsLoading && (
+            <Center p="md">
+              <Text c="dimmed">{t('common.loading')}</Text>
+            </Center>
+          )}
+
+          {!shortcutsLoading && shortcuts.length === 0 && (
+            <Center p="md">
+              <Text c="dimmed">{t('manageServices.noShortcuts')}</Text>
+            </Center>
+          )}
+
+          {!shortcutsLoading && shortcuts.length > 0 && (
+            <Stack gap="xs">
+              {shortcuts.map((sc) => (
+                <Paper key={sc.id} withBorder p="sm" radius="sm">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="sm" wrap="nowrap">
+                      {sc.color && (
+                        <ColorSwatch color={sc.color} size={18} />
+                      )}
+                      <div>
+                        <Text size="sm" fw={500}>
+                          {lang === 'ar' ? sc.label_ar : sc.label_en}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {lang === 'ar' ? sc.label_en : sc.label_ar}
+                        </Text>
+                      </div>
+                      {sc.preset_values && Object.keys(sc.preset_values).length > 0 && (
+                        <Badge variant="light" size="xs">
+                          {Object.keys(sc.preset_values).length} presets
+                        </Badge>
+                      )}
+                    </Group>
+                    <Group gap={4} wrap="nowrap">
+                      <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleDeleteShortcut(sc)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      </Modal>
+
+      {/* ── Shortcut editor modal ──────────────────────────────────────────── */}
+      <Modal
+        opened={shortcutEditorOpened}
+        onClose={shortcutEditorHandlers.close}
+        title={editingShortcut ? t('manageServices.editShortcut') : t('manageServices.newShortcut')}
+        size="md"
+        zIndex={300}
+      >
+        <form onSubmit={shortcutForm.onSubmit(submitShortcut)}>
+          <TextInput
+            label={t('services.nameEn')}
+            required
+            {...shortcutForm.getInputProps('label_en')}
+            mb="sm"
+          />
+          <TextInput
+            label={t('services.nameAr')}
+            required
+            dir="auto"
+            {...shortcutForm.getInputProps('label_ar')}
+            mb="sm"
+          />
+          <ColorInput
+            label={t('manageServices.color')}
+            format="hex"
+            swatches={COLOR_SWATCHES}
+            {...shortcutForm.getInputProps('color')}
+            mb="md"
+          />
+
+          {serviceFields.length > 0 && (
+            <>
+              <Divider label={t('manageServices.presetValues')} labelPosition="left" mb="sm" />
+              <Stack gap="sm" mb="sm">
+                {serviceFields.map((field) => (
+                  <ServiceFieldInput
+                    key={field.key}
+                    field={{ ...field, required: false }}
+                    value={presetValues[field.key]}
+                    onChange={(val) =>
+                      setPresetValues((prev) => ({ ...prev, [field.key]: val }))
+                    }
+                    optionLists={optionLists}
+                    lang={lang}
+                  />
+                ))}
+              </Stack>
+            </>
+          )}
+
+          <Divider mb="sm" />
+          <NumberInput
+            label={t('manageServices.presetCost')}
+            min={0}
+            value={presetCost === '' ? '' : presetCost}
+            onChange={(val) => setPresetCost(val)}
+            mb="md"
+          />
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={shortcutEditorHandlers.close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={shortcutSaving}>
               {t('common.save')}
             </Button>
           </Group>

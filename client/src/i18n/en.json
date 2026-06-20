@@ -253,7 +253,16 @@
     "backToServices": "Back to Services",
     "fieldCount": "fields",
     "deleteConfirm": "Delete this service?",
-    "selectNeedsOptions": "A dropdown field needs a shared list or at least one option"
+    "selectNeedsOptions": "A dropdown field needs a shared list or at least one option",
+    "shortcuts": "Shortcuts",
+    "addShortcut": "Add Shortcut",
+    "newShortcut": "New Shortcut",
+    "editShortcut": "Edit Shortcut",
+    "color": "Color",
+    "presetValues": "Preset values",
+    "presetCost": "Preset cost",
+    "noShortcuts": "No shortcuts yet",
+    "deleteShortcutConfirm": "Delete this shortcut?"
   },
   "settings": {
     "title": "Settings",
