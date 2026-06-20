@@ -9,15 +9,13 @@ import {
   Table,
   NumberInput,
   TextInput,
-  Textarea,
-  Select,
   Button,
   ActionIcon,
   Text,
   Badge,
   Center,
   Divider,
-  SimpleGrid,
+  Textarea,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconTrash, IconPlus, IconDeviceFloppy } from '@tabler/icons-react';
@@ -25,9 +23,7 @@ import { useTranslation } from 'react-i18next';
 import BarcodeInput from '../components/BarcodeInput.jsx';
 import { lookupByBarcode } from '../api/products.js';
 import { createTransaction } from '../api/transactions.js';
-import { listServiceTypes } from '../api/serviceTypes.js';
 import { formatMoney } from '../lib/format.js';
-import { refName } from '../lib/display.js';
 
 let lineCounter = 0;
 const nextKey = () => `line-${lineCounter++}`;
@@ -40,14 +36,7 @@ export default function NewTransaction() {
   const [type, setType] = useState('sale');
   const [lines, setLines] = useState([]);
   const [note, setNote] = useState('');
-  const [serviceTypes, setServiceTypes] = useState([]);
-  const [serviceTypeId, setServiceTypeId] = useState(null);
-  const [fee, setFee] = useState(0);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    listServiceTypes().then(setServiceTypes).catch(() => {});
-  }, []);
 
   const priceFor = (product) => (type === 'purchase' ? product.buying_price : product.selling_price);
 
@@ -86,24 +75,17 @@ export default function NewTransaction() {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const removeLine = (key) => setLines((prev) => prev.filter((l) => l.key !== key));
 
-  const onSelectServiceType = (val) => {
-    setServiceTypeId(val);
-    const st = serviceTypes.find((s) => String(s.id) === val);
-    if (st) setFee(st.default_fee || 0);
-  };
-
   const totals = useMemo(() => {
     const subtotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0), 0);
     const cost = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0), 0);
-    const feeVal = type === 'service' ? Number(fee) || 0 : 0;
-    const total = type === 'purchase' ? subtotal : subtotal + feeVal;
+    const total = subtotal;
     const profit = type === 'purchase' ? 0 : total - cost;
-    return { subtotal, total, profit, fee: feeVal };
-  }, [lines, fee, type]);
+    return { subtotal, total, profit };
+  }, [lines, type]);
 
   const canSubmit =
     !saving &&
-    (type === 'service' ? serviceTypeId || lines.length > 0 : lines.length > 0) &&
+    lines.length > 0 &&
     lines.every((l) => l.product_id || (l.name && l.name.trim()));
 
   const submit = async () => {
@@ -112,8 +94,6 @@ export default function NewTransaction() {
       const payload = {
         type,
         note: note || undefined,
-        service_type_id: type === 'service' && serviceTypeId ? Number(serviceTypeId) : undefined,
-        fee: type === 'service' ? Number(fee) || 0 : undefined,
         items: lines.map((l) => ({
           product_id: l.product_id || undefined,
           barcode: l.barcode || undefined,
@@ -146,24 +126,8 @@ export default function NewTransaction() {
         data={[
           { value: 'sale', label: t('txnType.sale') },
           { value: 'purchase', label: t('txnType.purchase') },
-          { value: 'service', label: t('txnType.service') },
         ]}
       />
-
-      {type === 'service' && (
-        <Paper withBorder p="md" radius="md">
-          <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <Select
-              label={t('newTxn.serviceType')}
-              data={serviceTypes.map((s) => ({ value: String(s.id), label: refName(s, lang) }))}
-              value={serviceTypeId}
-              onChange={onSelectServiceType}
-              clearable
-            />
-            <NumberInput label={t('newTxn.fee')} min={0} value={fee} onChange={setFee} />
-          </SimpleGrid>
-        </Paper>
-      )}
 
       <Paper withBorder p="md" radius="md">
         <Group align="flex-end" mb="sm">
@@ -264,11 +228,6 @@ export default function NewTransaction() {
             <Text size="sm" c="dimmed">
               {t('newTxn.subtotal')}: {formatMoney(totals.subtotal, lang)}
             </Text>
-            {type === 'service' && (
-              <Text size="sm" c="dimmed">
-                {t('newTxn.fee')}: {formatMoney(totals.fee, lang)}
-              </Text>
-            )}
             <Text fw={700}>
               {t('newTxn.total')}: {formatMoney(totals.total, lang)}
             </Text>

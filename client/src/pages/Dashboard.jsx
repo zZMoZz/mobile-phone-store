@@ -85,11 +85,12 @@ export default function Dashboard() {
         </Center>
       ) : (
         <>
-          <SimpleGrid cols={{ base: 2, md: 4 }}>
+          <SimpleGrid cols={{ base: 2, md: 5 }}>
             <StatCard label={t('dashboard.salesTotal')} value={formatMoney(data.totals.sales, lang)} color="blue" />
             <StatCard label={t('dashboard.profitTotal')} value={formatMoney(data.totals.profit, lang)} color="teal" />
             <StatCard label={t('dashboard.purchasesTotal')} value={formatMoney(data.totals.purchases, lang)} />
             <StatCard label={t('dashboard.txnCount')} value={formatNumber(data.totals.count, lang)} />
+            <StatCard label={t('dashboard.servicesTotal')} value={formatMoney(data.totals.services, lang)} color="grape" />
           </SimpleGrid>
 
           <Paper withBorder p="md" radius="md">
