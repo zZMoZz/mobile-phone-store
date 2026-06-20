@@ -4,171 +4,258 @@ import {
   Stack,
   Group,
   Button,
-  Paper,
-  Table,
-  ActionIcon,
   Text,
-  Badge,
+  SimpleGrid,
+  Card,
   Modal,
-  TextInput,
   NumberInput,
-  Switch,
-  Center,
+  Box,
+  Divider,
 } from '@mantine/core';
-import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import {
-  listServiceTypes,
-  createServiceType,
-  updateServiceType,
-  deleteServiceType,
-} from '../api/serviceTypes.js';
-import { formatMoney } from '../lib/format.js';
+import { useNavigate } from 'react-router-dom';
+import { IconSettings } from '@tabler/icons-react';
+import { listServices } from '../api/services.js';
+import { listServiceShortcuts } from '../api/serviceShortcuts.js';
+import { listOptionLists } from '../api/optionLists.js';
+import { createTransaction } from '../api/transactions.js';
+import { ServiceFieldInput } from '../components/ServiceFieldInputs.jsx';
+import { apiErrorMessage } from '../lib/apiError.js';
 
 export default function Services() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const [items, setItems] = useState([]);
-  const [editing, setEditing] = useState(null);
-  const [opened, handlers] = useDisclosure(false);
+  const navigate = useNavigate();
+
+  const [services, setServices] = useState([]);
+  const [shortcuts, setShortcuts] = useState([]);
+  const [optionLists, setOptionLists] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Record modal state
+  const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+  const [activeService, setActiveService] = useState(null);
+  const [activeShortcut, setActiveShortcut] = useState(null);
+  const [fieldValues, setFieldValues] = useState({});
+  const [cost, setCost] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const form = useForm({
-    initialValues: { name_en: '', name_ar: '', default_fee: 0, consumes_parts: false },
-    validate: {
-      name_en: (v) => (v.trim() ? null : 'required'),
-      name_ar: (v) => (v.trim() ? null : 'required'),
-    },
-  });
-
-  const load = () => listServiceTypes().then(setItems).catch(() => {});
   useEffect(() => {
-    load();
+    Promise.all([listServices(), listServiceShortcuts(), listOptionLists()])
+      .then(([svcs, scs, opts]) => {
+        setServices(svcs);
+        setShortcuts(scs);
+        setOptionLists(opts);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const openNew = () => {
-    setEditing(null);
-    form.setValues({ name_en: '', name_ar: '', default_fee: 0, consumes_parts: false });
-    handlers.open();
+  const openRecord = (service, shortcut) => {
+    setActiveService(service);
+    setActiveShortcut(shortcut || null);
+
+    // Pre-fill field values from shortcut preset_values (exclude cost)
+    if (shortcut?.preset_values) {
+      const { cost: presetCost, ...fieldPresets } = shortcut.preset_values;
+      setFieldValues(fieldPresets);
+      setCost(presetCost != null ? presetCost : '');
+    } else {
+      setFieldValues({});
+      setCost('');
+    }
+
+    openModal();
   };
 
-  const openEdit = (s) => {
-    setEditing(s);
-    form.setValues({
-      name_en: s.name_en,
-      name_ar: s.name_ar,
-      default_fee: s.default_fee,
-      consumes_parts: !!s.consumes_parts,
-    });
-    handlers.open();
+  const handleFieldChange = (key, value) => {
+    setFieldValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const submit = async (values) => {
+  const handleSave = async () => {
+    if (!activeService) return;
+
+    // Validate required fields
+    const missing = (activeService.fields || []).filter(
+      (f) => f.required && (fieldValues[f.key] == null || fieldValues[f.key] === '')
+    );
+    if (missing.length > 0) {
+      notifications.show({
+        message: missing
+          .map((f) => (lang === 'ar' ? f.label_ar : f.label_en))
+          .join(', ') + ': ' + t('common.error'),
+        color: 'red',
+      });
+      return;
+    }
+
+    const costNum = Number(cost);
+    if (!costNum || costNum <= 0) {
+      notifications.show({ message: t('services.cost') + ': ' + t('common.error'), color: 'red' });
+      return;
+    }
+
     setSaving(true);
     try {
-      if (editing) await updateServiceType(editing.id, values);
-      else await createServiceType(values);
-      notifications.show({ message: t('common.saved'), color: 'green' });
-      handlers.close();
-      load();
+      await createTransaction({
+        type: 'service',
+        service_id: activeService.id,
+        shortcut_id: activeShortcut?.id,
+        cost: costNum,
+        field_values: fieldValues,
+      });
+      notifications.show({ message: t('services.recorded'), color: 'green' });
+      closeModal();
+      setActiveService(null);
+      setActiveShortcut(null);
+      setFieldValues({});
+      setCost('');
     } catch (err) {
-      notifications.show({ message: err.response?.data?.error || t('common.error'), color: 'red' });
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (s) => {
-    if (!window.confirm(t('services.deleteConfirm'))) return;
-    await deleteServiceType(s.id);
-    notifications.show({ message: t('common.deleted'), color: 'green' });
-    load();
-  };
+  const serviceName = (svc) => (lang === 'ar' ? svc.name_ar : svc.name_en);
+  const shortcutLabel = (sc) => (lang === 'ar' ? sc.label_ar : sc.label_en);
 
   return (
-    <Stack>
+    <Stack gap="xl">
       <Group justify="space-between">
         <Title order={2}>{t('services.title')}</Title>
-        <Button leftSection={<IconPlus size={18} />} onClick={openNew}>
-          {t('services.addService')}
+        <Button
+          variant="default"
+          leftSection={<IconSettings size={18} />}
+          onClick={() => navigate('/services/manage')}
+        >
+          {t('services.manage')}
         </Button>
       </Group>
-      <Text c="dimmed">{t('services.intro')}</Text>
 
-      <Paper withBorder radius="md">
-        <Table highlightOnHover verticalSpacing="sm">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('services.nameEn')}</Table.Th>
-              <Table.Th>{t('services.nameAr')}</Table.Th>
-              <Table.Th>{t('services.defaultFee')}</Table.Th>
-              <Table.Th>{t('services.consumesParts')}</Table.Th>
-              <Table.Th>{t('common.actions')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {items.map((s) => (
-              <Table.Tr key={s.id}>
-                <Table.Td>{s.name_en}</Table.Td>
-                <Table.Td>{s.name_ar}</Table.Td>
-                <Table.Td>{formatMoney(s.default_fee, lang)}</Table.Td>
-                <Table.Td>
-                  {s.consumes_parts ? (
-                    <Badge color="grape" variant="light">
-                      {t('common.yes')}
-                    </Badge>
-                  ) : (
-                    <Text c="dimmed">{t('common.no')}</Text>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4}>
-                    <ActionIcon variant="subtle" onClick={() => openEdit(s)}>
-                      <IconEdit size={16} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="red" onClick={() => remove(s)}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
+      {!loading && services.length === 0 && (
+        <Text c="dimmed" ta="center" py="xl">
+          {t('common.noResults')}
+        </Text>
+      )}
+
+      {services.map((svc) => {
+        const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
+
+        return (
+          <Box key={svc.id}>
+            <Text fw={600} size="lg" mb="sm">
+              {serviceName(svc)}
+            </Text>
+            <Divider mb="sm" />
+            <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
+              {svcShortcuts.map((sc) => (
+                <Card
+                  key={sc.id}
+                  withBorder
+                  radius="md"
+                  padding="md"
+                  style={{
+                    cursor: 'pointer',
+                    borderLeft: `4px solid var(--mantine-color-${sc.color || 'gray'}-5)`,
+                    transition: 'box-shadow 0.15s',
+                  }}
+                  styles={{
+                    root: {
+                      '&:hover': { boxShadow: 'var(--mantine-shadow-sm)' },
+                    },
+                  }}
+                  onClick={() => openRecord(svc, sc)}
+                >
+                  <Button
+                    variant="light"
+                    color={sc.color || 'gray'}
+                    fullWidth
+                    styles={{ root: { pointerEvents: 'none' } }}
+                    size="sm"
+                  >
+                    {shortcutLabel(sc)}
+                  </Button>
+                </Card>
+              ))}
+
+              {/* "Record without shortcut" entry per service */}
+              <Card
+                withBorder
+                radius="md"
+                padding="md"
+                style={{
+                  cursor: 'pointer',
+                  borderLeft: '4px solid var(--mantine-color-gray-4)',
+                }}
+                onClick={() => openRecord(svc, null)}
+              >
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  fullWidth
+                  styles={{ root: { pointerEvents: 'none' } }}
+                  size="sm"
+                >
+                  {t('services.recordWithoutShortcut')}
+                </Button>
+              </Card>
+            </SimpleGrid>
+          </Box>
+        );
+      })}
+
+      {/* Record modal */}
+      <Modal
+        opened={modalOpened}
+        onClose={closeModal}
+        title={t('services.recordTitle')}
+        size="md"
+      >
+        {activeService && (
+          <Stack gap="md">
+            <Box>
+              <Text fw={600} size="md">
+                {serviceName(activeService)}
+              </Text>
+              {activeShortcut && (
+                <Text size="sm" c="dimmed">
+                  {shortcutLabel(activeShortcut)}
+                </Text>
+              )}
+            </Box>
+
+            {(activeService.fields || []).map((field) => (
+              <ServiceFieldInput
+                key={field.key}
+                field={field}
+                value={fieldValues[field.key]}
+                onChange={(val) => handleFieldChange(field.key, val)}
+                optionLists={optionLists}
+                lang={lang}
+              />
             ))}
-            {items.length === 0 && (
-              <Table.Tr>
-                <Table.Td colSpan={5}>
-                  <Center p="lg">
-                    <Text c="dimmed">{t('common.noResults')}</Text>
-                  </Center>
-                </Table.Td>
-              </Table.Tr>
-            )}
-          </Table.Tbody>
-        </Table>
-      </Paper>
 
-      <Modal opened={opened} onClose={handlers.close} title={editing ? t('services.editService') : t('services.newService')}>
-        <form onSubmit={form.onSubmit(submit)}>
-          <TextInput label={t('services.nameEn')} required {...form.getInputProps('name_en')} mb="sm" />
-          <TextInput label={t('services.nameAr')} required {...form.getInputProps('name_ar')} mb="sm" />
-          <NumberInput label={t('services.defaultFee')} min={0} {...form.getInputProps('default_fee')} mb="sm" />
-          <Switch
-            label={t('services.consumesParts')}
-            checked={form.values.consumes_parts}
-            onChange={(e) => form.setFieldValue('consumes_parts', e.currentTarget.checked)}
-            mb="md"
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={handlers.close}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" loading={saving}>
-              {t('common.save')}
-            </Button>
-          </Group>
-        </form>
+            <NumberInput
+              label={t('services.cost')}
+              required
+              min={0}
+              value={cost}
+              onChange={setCost}
+            />
+
+            <Group justify="flex-end" mt="xs">
+              <Button variant="default" onClick={closeModal}>
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={handleSave} loading={saving}>
+                {t('common.save')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
     </Stack>
   );
