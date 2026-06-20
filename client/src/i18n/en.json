@@ -208,7 +208,13 @@
     "protectedTooltip": "Default item — can't be deleted",
     "nameRequired": "Required",
     "quickAddCategory": "New category",
-    "quickAddBrand": "New brand"
+    "quickAddBrand": "New brand",
+    "optionLists": "Option Lists",
+    "addOptionList": "Add Option List",
+    "newOptionList": "New Option List",
+    "editOptionList": "Edit Option List",
+    "optionsLabel": "Options",
+    "optionsHint": "Type an option and press Enter"
   },
   "dashboard": {
     "title": "Dashboard",

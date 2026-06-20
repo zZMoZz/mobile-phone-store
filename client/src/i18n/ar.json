@@ -208,7 +208,13 @@
     "protectedTooltip": "عنصر افتراضي — لا يمكن حذفه",
     "nameRequired": "مطلوب",
     "quickAddCategory": "فئة جديدة",
-    "quickAddBrand": "ماركة جديدة"
+    "quickAddBrand": "ماركة جديدة",
+    "optionLists": "قوائم الخيارات",
+    "addOptionList": "إضافة قائمة خيارات",
+    "newOptionList": "قائمة خيارات جديدة",
+    "editOptionList": "تعديل قائمة الخيارات",
+    "optionsLabel": "الخيارات",
+    "optionsHint": "اكتب خيارًا واضغط Enter"
   },
   "dashboard": {
     "title": "لوحة المعلومات",
