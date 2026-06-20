@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    allowedHosts: ['mutate-distant-amenity.ngrok-free.dev'],
     proxy: {
       '/api': 'http://localhost:4000',
       '/uploads': 'http://localhost:4000',

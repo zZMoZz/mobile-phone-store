@@ -20,11 +20,12 @@ import {
   NumberInput,
   Badge,
   ColorSwatch,
+  Box,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconEdit, IconTrash, IconArrowLeft, IconBolt } from '@tabler/icons-react';
+import { IconPlus, IconEdit, IconTrash, IconArrowLeft } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { listServices, createService, updateService, deleteService } from '../api/services.js';
@@ -32,10 +33,11 @@ import { listOptionLists } from '../api/optionLists.js';
 import { listServiceShortcuts, createServiceShortcut, updateServiceShortcut, deleteServiceShortcut } from '../api/serviceShortcuts.js';
 import { apiErrorMessage } from '../lib/apiError.js';
 import { ServiceFieldInput } from '../components/ServiceFieldInputs.jsx';
+import OptionListSection from '../components/OptionListSection.jsx';
 
 const BLANK_FIELD = () => ({
   _uid: crypto.randomUUID(),
-  key: '',
+  key: crypto.randomUUID(),
   label_en: '',
   label_ar: '',
   type: 'text',
@@ -62,13 +64,11 @@ export default function ManageServices() {
   const [opened, handlers] = useDisclosure(false);
   const [saving, setSaving] = useState(false);
 
-  // Shortcuts modal state
-  const [shortcutsService, setShortcutsService] = useState(null);
+  // All shortcuts (loaded once, reloaded after mutations)
   const [shortcuts, setShortcuts] = useState([]);
-  const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
-  const [shortcutsLoading, setShortcutsLoading] = useState(false);
 
-  // Shortcut editor state (nested modal)
+  // Shortcut editor state
+  const [shortcutsService, setShortcutsService] = useState(null);
   const [editingShortcut, setEditingShortcut] = useState(null);
   const [shortcutEditorOpened, shortcutEditorHandlers] = useDisclosure(false);
   const [shortcutSaving, setShortcutSaving] = useState(false);
@@ -99,9 +99,14 @@ export default function ManageServices() {
     },
   });
 
+  const reloadShortcuts = () => {
+    listServiceShortcuts().then(setShortcuts).catch(() => {});
+  };
+
   const load = () => {
     listServices().then(setServices).catch(() => {});
     listOptionLists().then(setOptionLists).catch(() => {});
+    reloadShortcuts();
   };
 
   useEffect(() => {
@@ -195,26 +200,8 @@ export default function ManageServices() {
 
   // ── Shortcuts ──────────────────────────────────────────────────────────────
 
-  const loadShortcuts = async (serviceId) => {
-    setShortcutsLoading(true);
-    try {
-      const data = await listServiceShortcuts(serviceId);
-      setShortcuts(data);
-    } catch (err) {
-      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
-    } finally {
-      setShortcutsLoading(false);
-    }
-  };
-
-  const openShortcuts = (svc) => {
+  const openNewShortcut = (svc) => {
     setShortcutsService(svc);
-    setShortcuts([]);
-    shortcutsHandlers.open();
-    loadShortcuts(svc.id);
-  };
-
-  const openNewShortcut = () => {
     setEditingShortcut(null);
     shortcutForm.setValues({ label_en: '', label_ar: '', color: '' });
     setPresetValues({});
@@ -223,6 +210,8 @@ export default function ManageServices() {
   };
 
   const openEditShortcut = (sc) => {
+    const svc = services.find((s) => s.id === sc.service_id) || null;
+    setShortcutsService(svc);
     setEditingShortcut(sc);
     const { cost, ...fieldPresets } = sc.preset_values || {};
     shortcutForm.setValues({
@@ -263,7 +252,7 @@ export default function ManageServices() {
 
       notifications.show({ message: t('common.saved'), color: 'green' });
       shortcutEditorHandlers.close();
-      loadShortcuts(shortcutsService.id);
+      reloadShortcuts();
     } catch (err) {
       notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
     } finally {
@@ -276,7 +265,7 @@ export default function ManageServices() {
     try {
       await deleteServiceShortcut(sc.id);
       notifications.show({ message: t('common.deleted'), color: 'green' });
-      loadShortcuts(shortcutsService.id);
+      reloadShortcuts();
     } catch (err) {
       notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
     }
@@ -309,7 +298,7 @@ export default function ManageServices() {
       <Group justify="space-between">
         <Title order={2}>{t('manageServices.title')}</Title>
         <Group>
-          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate('/services')}>
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate('/new-transaction')}>
             {t('manageServices.backToServices')}
           </Button>
           <Button leftSection={<IconPlus size={18} />} onClick={openNew}>
@@ -340,14 +329,6 @@ export default function ManageServices() {
                 </Table.Td>
                 <Table.Td>
                   <Group gap={4} wrap="nowrap">
-                    <Button
-                      variant="subtle"
-                      size="xs"
-                      leftSection={<IconBolt size={14} />}
-                      onClick={() => openShortcuts(svc)}
-                    >
-                      {t('manageServices.shortcuts')}
-                    </Button>
                     <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
                       <IconEdit size={16} />
                     </ActionIcon>
@@ -370,6 +351,73 @@ export default function ManageServices() {
           </Table.Tbody>
         </Table>
       </Paper>
+
+      {/* ── Inline shortcuts section ───────────────────────────────────────── */}
+      {services.map((svc) => {
+        const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
+        return (
+          <Box key={svc.id}>
+            <Divider
+              label={
+                <Group gap="xs">
+                  <Text size="sm" fw={500}>{t('manageServices.shortcuts')} — {localizedName(svc)}</Text>
+                </Group>
+              }
+              labelPosition="left"
+              mb="sm"
+            />
+            <Stack gap="xs" mb="xs">
+              {svcShortcuts.length === 0 && (
+                <Text size="sm" c="dimmed" px="xs">{t('manageServices.noShortcuts')}</Text>
+              )}
+              {svcShortcuts.map((sc) => (
+                <Paper key={sc.id} withBorder p="sm" radius="sm">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="sm" wrap="nowrap">
+                      {sc.color && (
+                        <ColorSwatch color={sc.color} size={18} />
+                      )}
+                      <div>
+                        <Text size="sm" fw={500}>
+                          {lang === 'ar' ? sc.label_ar : sc.label_en}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {lang === 'ar' ? sc.label_en : sc.label_ar}
+                        </Text>
+                      </div>
+                      {sc.preset_values && Object.keys(sc.preset_values).length > 0 && (
+                        <Badge variant="light" size="xs">
+                          {t('manageServices.presetsCount', { count: Object.keys(sc.preset_values).length })}
+                        </Badge>
+                      )}
+                    </Group>
+                    <Group gap={4} wrap="nowrap">
+                      <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleDeleteShortcut(sc)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+            <Button
+              variant="light"
+              size="xs"
+              leftSection={<IconPlus size={14} />}
+              onClick={() => openNewShortcut(svc)}
+            >
+              {t('manageServices.addShortcut')}
+            </Button>
+          </Box>
+        );
+      })}
 
       {/* ── Service edit modal ─────────────────────────────────────────────── */}
       <Modal
@@ -399,12 +447,6 @@ export default function ManageServices() {
             {form.values.fields.map((field, index) => (
               <Paper key={field._uid} withBorder p="sm" radius="sm">
                 <Group align="flex-start" wrap="wrap" gap="sm">
-                  <TextInput
-                    label={t('manageServices.fieldKey')}
-                    value={field.key}
-                    onChange={(e) => setFieldProp(index, 'key', e.currentTarget.value)}
-                    style={{ flex: '1 1 120px', minWidth: 100 }}
-                  />
                   <TextInput
                     label={t('services.nameEn')}
                     value={field.label_en}
@@ -507,82 +549,8 @@ export default function ManageServices() {
         </form>
       </Modal>
 
-      {/* ── Shortcuts list modal ───────────────────────────────────────────── */}
-      <Modal
-        opened={shortcutsOpened}
-        onClose={shortcutsHandlers.close}
-        title={
-          shortcutsService
-            ? `${t('manageServices.shortcuts')} — ${localizedName(shortcutsService)}`
-            : t('manageServices.shortcuts')
-        }
-        size="lg"
-      >
-        <Stack>
-          <Group justify="flex-end">
-            <Button
-              size="xs"
-              leftSection={<IconPlus size={14} />}
-              onClick={openNewShortcut}
-            >
-              {t('manageServices.addShortcut')}
-            </Button>
-          </Group>
-
-          {shortcutsLoading && (
-            <Center p="md">
-              <Text c="dimmed">{t('common.loading')}</Text>
-            </Center>
-          )}
-
-          {!shortcutsLoading && shortcuts.length === 0 && (
-            <Center p="md">
-              <Text c="dimmed">{t('manageServices.noShortcuts')}</Text>
-            </Center>
-          )}
-
-          {!shortcutsLoading && shortcuts.length > 0 && (
-            <Stack gap="xs">
-              {shortcuts.map((sc) => (
-                <Paper key={sc.id} withBorder p="sm" radius="sm">
-                  <Group justify="space-between" wrap="nowrap">
-                    <Group gap="sm" wrap="nowrap">
-                      {sc.color && (
-                        <ColorSwatch color={sc.color} size={18} />
-                      )}
-                      <div>
-                        <Text size="sm" fw={500}>
-                          {lang === 'ar' ? sc.label_ar : sc.label_en}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {lang === 'ar' ? sc.label_en : sc.label_ar}
-                        </Text>
-                      </div>
-                      {sc.preset_values && Object.keys(sc.preset_values).length > 0 && (
-                        <Badge variant="light" size="xs">
-                          {t('manageServices.presetsCount', { count: Object.keys(sc.preset_values).length })}
-                        </Badge>
-                      )}
-                    </Group>
-                    <Group gap={4} wrap="nowrap">
-                      <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => handleDeleteShortcut(sc)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-                </Paper>
-              ))}
-            </Stack>
-          )}
-        </Stack>
-      </Modal>
+      {/* ── Option Lists ──────────────────────────────────────────────────── */}
+      <OptionListSection />
 
       {/* ── Shortcut editor modal ──────────────────────────────────────────── */}
       <Modal
@@ -590,7 +558,6 @@ export default function ManageServices() {
         onClose={shortcutEditorHandlers.close}
         title={editingShortcut ? t('manageServices.editShortcut') : t('manageServices.newShortcut')}
         size="md"
-        zIndex={300}
       >
         <form onSubmit={shortcutForm.onSubmit(submitShortcut)}>
           <TextInput

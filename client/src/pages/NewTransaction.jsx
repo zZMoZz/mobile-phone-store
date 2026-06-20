@@ -18,12 +18,13 @@ import {
   Textarea,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconTrash, IconPlus, IconDeviceFloppy } from '@tabler/icons-react';
+import { IconTrash, IconPlus, IconDeviceFloppy, IconSettings } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import BarcodeInput from '../components/BarcodeInput.jsx';
 import { lookupByBarcode } from '../api/products.js';
 import { createTransaction } from '../api/transactions.js';
 import { formatMoney } from '../lib/format.js';
+import ServiceRecorder from '../components/ServiceRecorder.jsx';
 
 let lineCounter = 0;
 const nextKey = () => `line-${lineCounter++}`;
@@ -126,128 +127,147 @@ export default function NewTransaction() {
         data={[
           { value: 'sale', label: t('txnType.sale') },
           { value: 'purchase', label: t('txnType.purchase') },
+          { value: 'service', label: t('txnType.service') },
         ]}
       />
 
-      <Paper withBorder p="md" radius="md">
-        <Group align="flex-end" mb="sm">
-          <BarcodeInput
-            onScan={handleScan}
-            placeholder={t('newTxn.scanToAdd')}
-            style={{ flex: 1 }}
-          />
-          <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
-            {t('newTxn.manualAdd')}
-          </Button>
-        </Group>
+      {type === 'service' ? (
+        <>
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              size="xs"
+              leftSection={<IconSettings size={16} />}
+              onClick={() => navigate('/services/manage')}
+            >
+              {t('services.manage')}
+            </Button>
+          </Group>
+          <ServiceRecorder />
+        </>
+      ) : (
+        <>
+          <Paper withBorder p="md" radius="md">
+            <Group align="flex-end" mb="sm">
+              <BarcodeInput
+                onScan={handleScan}
+                placeholder={t('newTxn.scanToAdd')}
+                style={{ flex: 1 }}
+              />
+              <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
+                {t('newTxn.manualAdd')}
+              </Button>
+            </Group>
 
-        <Table verticalSpacing="xs">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('newTxn.item')}</Table.Th>
-              <Table.Th w={90}>{t('newTxn.quantity')}</Table.Th>
-              <Table.Th w={130}>{t('newTxn.unitPrice')}</Table.Th>
-              {type !== 'purchase' && <Table.Th w={130}>{t('newTxn.unitCost')}</Table.Th>}
-              <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
-              <Table.Th w={48} />
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {lines.map((l) => (
-              <Table.Tr key={l.key}>
-                <Table.Td>
-                  {l.product_id ? (
-                    <Group gap={6}>
-                      <Text fw={500}>{l.name}</Text>
-                      {l.barcode ? (
-                        <Text size="xs" c="dimmed">
-                          {l.barcode}
-                        </Text>
-                      ) : null}
-                    </Group>
-                  ) : (
-                    <TextInput
-                      placeholder={t('newTxn.newItemName')}
-                      value={l.name}
-                      onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
-                    />
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <NumberInput
-                    min={1}
-                    value={l.quantity}
-                    onChange={(v) => updateLine(l.key, { quantity: v })}
-                    hideControls
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <NumberInput
-                    min={0}
-                    value={l.unit_price}
-                    onChange={(v) => updateLine(l.key, { unit_price: v })}
-                    hideControls
-                  />
-                </Table.Td>
-                {type !== 'purchase' && (
-                  <Table.Td>
-                    <NumberInput
-                      min={0}
-                      value={l.unit_cost}
-                      onChange={(v) => updateLine(l.key, { unit_cost: v })}
-                      hideControls
-                    />
-                  </Table.Td>
+            <Table verticalSpacing="xs">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('newTxn.item')}</Table.Th>
+                  <Table.Th w={90}>{t('newTxn.quantity')}</Table.Th>
+                  <Table.Th w={130}>{t('newTxn.unitPrice')}</Table.Th>
+                  {type !== 'purchase' && <Table.Th w={130}>{t('newTxn.unitCost')}</Table.Th>}
+                  <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
+                  <Table.Th w={48} />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {lines.map((l) => (
+                  <Table.Tr key={l.key}>
+                    <Table.Td>
+                      {l.product_id ? (
+                        <Group gap={6}>
+                          <Text fw={500}>{l.name}</Text>
+                          {l.barcode ? (
+                            <Text size="xs" c="dimmed">
+                              {l.barcode}
+                            </Text>
+                          ) : null}
+                        </Group>
+                      ) : (
+                        <TextInput
+                          placeholder={t('newTxn.newItemName')}
+                          value={l.name}
+                          onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
+                        />
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <NumberInput
+                        min={1}
+                        value={l.quantity}
+                        onChange={(v) => updateLine(l.key, { quantity: v })}
+                        hideControls
+                      />
+                    </Table.Td>
+                    <Table.Td>
+                      <NumberInput
+                        min={0}
+                        value={l.unit_price}
+                        onChange={(v) => updateLine(l.key, { unit_price: v })}
+                        hideControls
+                      />
+                    </Table.Td>
+                    {type !== 'purchase' && (
+                      <Table.Td>
+                        <NumberInput
+                          min={0}
+                          value={l.unit_cost}
+                          onChange={(v) => updateLine(l.key, { unit_cost: v })}
+                          hideControls
+                        />
+                      </Table.Td>
+                    )}
+                    <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>
+                    <Table.Td>
+                      <ActionIcon variant="subtle" color="red" onClick={() => removeLine(l.key)}>
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+                {lines.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={6}>
+                      <Center p="md">
+                        <Text c="dimmed">{t('newTxn.empty')}</Text>
+                      </Center>
+                    </Table.Td>
+                  </Table.Tr>
                 )}
-                <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>
-                <Table.Td>
-                  <ActionIcon variant="subtle" color="red" onClick={() => removeLine(l.key)}>
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-            {lines.length === 0 && (
-              <Table.Tr>
-                <Table.Td colSpan={6}>
-                  <Center p="md">
-                    <Text c="dimmed">{t('newTxn.empty')}</Text>
-                  </Center>
-                </Table.Td>
-              </Table.Tr>
-            )}
-          </Table.Tbody>
-        </Table>
-      </Paper>
+              </Table.Tbody>
+            </Table>
+          </Paper>
 
-      <Paper withBorder p="md" radius="md">
-        <Textarea label={t('newTxn.note')} value={note} onChange={(e) => setNote(e.currentTarget.value)} mb="md" autosize minRows={1} />
-        <Divider mb="sm" />
-        <Group justify="space-between">
-          <Stack gap={2}>
-            <Text size="sm" c="dimmed">
-              {t('newTxn.subtotal')}: {formatMoney(totals.subtotal, lang)}
-            </Text>
-            <Text fw={700}>
-              {t('newTxn.total')}: {formatMoney(totals.total, lang)}
-            </Text>
-            {type !== 'purchase' && (
-              <Badge color="teal" variant="light">
-                {t('newTxn.profit')}: {formatMoney(totals.profit, lang)}
-              </Badge>
-            )}
-          </Stack>
-          <Button
-            size="md"
-            leftSection={<IconDeviceFloppy size={18} />}
-            disabled={!canSubmit}
-            loading={saving}
-            onClick={submit}
-          >
-            {t('newTxn.record')}
-          </Button>
-        </Group>
-      </Paper>
+          <Paper withBorder p="md" radius="md">
+            <Textarea label={t('newTxn.note')} value={note} onChange={(e) => setNote(e.currentTarget.value)} mb="md" autosize minRows={1} />
+            <Divider mb="sm" />
+            <Group justify="space-between">
+              <Stack gap={2}>
+                <Text size="sm" c="dimmed">
+                  {t('newTxn.subtotal')}: {formatMoney(totals.subtotal, lang)}
+                </Text>
+                <Text fw={700}>
+                  {t('newTxn.total')}: {formatMoney(totals.total, lang)}
+                </Text>
+                {type !== 'purchase' && (
+                  <Badge color="teal" variant="light">
+                    {t('newTxn.profit')}: {formatMoney(totals.profit, lang)}
+                  </Badge>
+                )}
+              </Stack>
+              <Button
+                size="md"
+                leftSection={<IconDeviceFloppy size={18} />}
+                disabled={!canSubmit}
+                loading={saving}
+                onClick={submit}
+              >
+                {t('newTxn.record')}
+              </Button>
+            </Group>
+          </Paper>
+        </>
+      )}
     </Stack>
   );
 }
