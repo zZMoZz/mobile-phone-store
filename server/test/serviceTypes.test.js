@@ -12,10 +12,10 @@ describe('service-types API', () => {
 
   afterAll(() => cleanup());
 
-  it('lists seeded service types', async () => {
+  it('lists service types (no longer seeded)', async () => {
     const res = await request(app).get('/api/service-types');
     expect(res.status).toBe(200);
-    expect(res.body.length).toBeGreaterThanOrEqual(3);
+    expect(Array.isArray(res.body)).toBe(true);
   });
 
   it('creates, updates, and deletes a service type', async () => {

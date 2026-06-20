@@ -35,7 +35,9 @@ function makeRepo(table, usageColumn) {
     list: () =>
       getDb()
         .prepare(
-          `SELECT t.*, (SELECT COUNT(*) FROM products p WHERE p.${usageColumn} = t.id) AS product_count
+          `SELECT t.*,
+             (SELECT COUNT(*) FROM products p WHERE p.${usageColumn} = t.id) AS product_count,
+             (SELECT COALESCE(SUM(p.quantity), 0) FROM products p WHERE p.${usageColumn} = t.id) AS units_count
            FROM ${table} t ORDER BY t.name_en`,
         )
         .all(),

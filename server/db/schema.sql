@@ -15,6 +15,31 @@ CREATE TABLE IF NOT EXISTS brands (
   is_protected INTEGER NOT NULL DEFAULT 0   -- 1 = default item (e.g. Generic), can't be deleted
 );
 
+CREATE TABLE IF NOT EXISTS option_lists (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  name_en   TEXT NOT NULL,
+  name_ar   TEXT NOT NULL,
+  options   TEXT NOT NULL DEFAULT '[]'    -- JSON array of strings
+);
+
+CREATE TABLE IF NOT EXISTS services (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name_en    TEXT NOT NULL,
+  name_ar    TEXT NOT NULL,
+  fields     TEXT NOT NULL DEFAULT '[]',  -- JSON array of field defs
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS service_shortcuts (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  service_id    INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+  label_en      TEXT NOT NULL,
+  label_ar      TEXT NOT NULL,
+  color         TEXT,
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  preset_values TEXT NOT NULL DEFAULT '{}' -- JSON object {fieldKey: value, cost?}
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   name          TEXT NOT NULL,                 -- Arabic or English, free-form
@@ -48,6 +73,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   type            TEXT NOT NULL CHECK (type IN ('purchase','sale','service')),
   service_type_id INTEGER REFERENCES service_types(id) ON DELETE SET NULL,
+  service_id      INTEGER REFERENCES services(id) ON DELETE SET NULL,
+  service_data    TEXT,                        -- JSON snapshot for service transactions
   note            TEXT,
   subtotal        REAL NOT NULL DEFAULT 0,     -- sum of item line totals
   fee             REAL NOT NULL DEFAULT 0,     -- service fee (service transactions)

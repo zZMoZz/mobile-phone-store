@@ -21,7 +21,7 @@ describe('health + seed', () => {
 
   it('seeds default reference data', () => {
     const categories = db.prepare('SELECT COUNT(*) AS c FROM categories').get().c;
-    const services = db.prepare('SELECT COUNT(*) AS c FROM service_types').get().c;
+    const services = db.prepare('SELECT COUNT(*) AS c FROM services').get().c;
     const settings = db.prepare('SELECT currency FROM settings WHERE id = 1').get();
     expect(categories).toBeGreaterThan(0);
     expect(services).toBeGreaterThan(0);

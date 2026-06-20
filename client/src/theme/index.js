@@ -7,6 +7,13 @@ export const theme = createTheme({
   fontFamily:
     'Segoe UI, Tahoma, "Noto Sans Arabic", system-ui, -apple-system, sans-serif',
   defaultRadius: 'md',
+  fontSizes: {
+    xs: '0.8rem',
+    sm: '0.9375rem',
+    md: '1.0625rem',
+    lg: '1.1875rem',
+    xl: '1.3125rem',
+  },
   colors: {
     // Dark palette overridden so the global dark background is rgb(20,20,20).
     // dark[7] is the body background; dark[6] is elevated surfaces (cards,

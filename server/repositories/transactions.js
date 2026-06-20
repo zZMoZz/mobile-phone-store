@@ -1,5 +1,6 @@
 import { getDb } from '../db/connection.js';
 import * as products from './products.js';
+import * as services from './services.js';
 
 /** Transaction history for a single product, most recent first. */
 export function listByProduct(productId) {
@@ -25,7 +26,8 @@ export function getById(id) {
   if (txn.service_type_id) {
     serviceType = getDb().prepare('SELECT * FROM service_types WHERE id = ?').get(txn.service_type_id);
   }
-  return { ...txn, items, service_type: serviceType };
+  const serviceData = txn.service_data ? JSON.parse(txn.service_data) : null;
+  return { ...txn, items, service_type: serviceType, service_data: serviceData };
 }
 
 /**
@@ -105,6 +107,55 @@ function resolveProduct(item, type) {
   return { product: created, created: true, isTemporary };
 }
 
+// Builds + inserts a pure-revenue service transaction: total = cost, profit = 0,
+// no inventory movement. Snapshots the filled custom fields (with their labels) so
+// history survives later edits to the service definition.
+function createServiceTransaction(payload) {
+  const service = services.getById(Number(payload.service_id));
+  if (!service) {
+    const err = new Error('Service not found');
+    err.status = 400;
+    err.code = 'service_missing';
+    throw err;
+  }
+  const cost = round2(payload.cost);
+  if (!(cost > 0)) {
+    const err = new Error('Cost must be greater than 0');
+    err.status = 400;
+    err.code = 'service_cost_positive';
+    throw err;
+  }
+  const values = payload.field_values || {};
+  const snapshotFields = service.fields.map((f) => {
+    const raw = values[f.key];
+    const value = raw == null ? '' : String(raw).trim();
+    if (f.required && !value) {
+      const err = new Error(`Field "${f.label_en}" is required`);
+      err.status = 400;
+      err.code = 'service_field_required';
+      throw err;
+    }
+    return { label_en: f.label_en, label_ar: f.label_ar, value };
+  });
+
+  const serviceData = JSON.stringify({
+    service_id: service.id,
+    service_name: service.name_en,
+    shortcut_id: payload.shortcut_id ? Number(payload.shortcut_id) : null,
+    fields: snapshotFields,
+    cost,
+  });
+
+  const db = getDb();
+  const info = db
+    .prepare(
+      `INSERT INTO transactions (type, service_id, service_data, note, subtotal, fee, cost_total, total, profit)
+       VALUES ('service', @service_id, @service_data, @note, 0, 0, 0, @total, 0)`,
+    )
+    .run({ service_id: service.id, service_data: serviceData, note: payload.note || null, total: cost });
+  return getById(info.lastInsertRowid);
+}
+
 /**
  * Records a transaction atomically: inserts the transaction + line items,
  * adjusts product stock, and computes totals/profit.
@@ -122,6 +173,7 @@ export function create(payload) {
     err.status = 400;
     throw err;
   }
+  if (type === 'service') return createServiceTransaction(payload);
   const rawItems = Array.isArray(payload.items) ? payload.items : [];
   const fee = type === 'service' ? round2(payload.fee) : 0;
 

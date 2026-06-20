@@ -107,4 +107,22 @@ describe('analytics, settings, and data export', () => {
     expect(txns.status).toBe(200);
     expect(txns.text).toContain('Type');
   });
+
+  it('counts service money as revenue but not as profit', async () => {
+    const svc = await request(app).post('/api/services').send({ name_en: 'Recharge', name_ar: 'شحن', fields: [] });
+    const before = await request(app).get('/api/analytics');
+    const profitBefore = before.body.totals.profit;
+    const servicesBefore = before.body.totals.services;
+    const trendSalesBefore = before.body.trend.reduce((s, b) => s + b.sales, 0);
+
+    await request(app)
+      .post('/api/transactions')
+      .send({ type: 'service', service_id: svc.body.id, cost: 250 });
+
+    const after = await request(app).get('/api/analytics');
+    expect(after.body.totals.services).toBe(servicesBefore + 250); // revenue counted
+    expect(after.body.totals.profit).toBe(profitBefore); // profit unchanged
+    const trendSalesAfter = after.body.trend.reduce((s, b) => s + b.sales, 0);
+    expect(trendSalesAfter).toBe(trendSalesBefore); // service revenue is NOT in the trend
+  });
 });
