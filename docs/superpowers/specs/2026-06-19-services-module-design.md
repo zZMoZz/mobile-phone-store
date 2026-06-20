@@ -30,7 +30,10 @@ into a faster, field-rich module with reusable **shortcuts**.
 New tables (follow the existing bilingual reference-repo pattern in
 `server/repositories/reference.js`):
 
-- **`services`**: `id, name_en, name_ar, fields (JSON), is_protected, sort_order`.
+- **`services`**: `id, name_en, name_ar, fields (JSON), sort_order`. _(Note: `is_protected`
+  was deliberately deferred in Phase 1 — services aren't a required FK, so deleting one is
+  safe (`transactions.service_id` → NULL, snapshot retained). Revisit in Phase 2 if the
+  management UI wants protected default services; adding the column is a one-line migration.)_
   `fields` = array of field defs:
   ```json
   [
