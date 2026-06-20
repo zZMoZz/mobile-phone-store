@@ -251,7 +251,9 @@
     "sharedList": "Shared list",
     "inlineOptions": "Inline options",
     "backToServices": "Back to Services",
-    "fieldCount": "fields"
+    "fieldCount": "fields",
+    "deleteConfirm": "Delete this service?",
+    "selectNeedsOptions": "A dropdown field needs a shared list or at least one option"
   },
   "settings": {
     "title": "Settings",

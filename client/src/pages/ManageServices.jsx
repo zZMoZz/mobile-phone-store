@@ -28,6 +28,7 @@ import { listOptionLists } from '../api/optionLists.js';
 import { apiErrorMessage } from '../lib/apiError.js';
 
 const BLANK_FIELD = () => ({
+  _uid: crypto.randomUUID(),
   key: '',
   label_en: '',
   label_ar: '',
@@ -83,6 +84,7 @@ export default function ManageServices() {
     // Reconstruct _source for each field so the UI knows which toggle to show
     const fields = (svc.fields || []).map((f) => ({
       ...f,
+      _uid: crypto.randomUUID(),
       _source: f.option_list_id != null ? 'shared' : 'inline',
       option_list_id: f.option_list_id ?? null,
       options: f.options ?? [],
@@ -104,10 +106,17 @@ export default function ManageServices() {
   };
 
   const submit = async (values) => {
+    const invalidSelect = values.fields.find(
+      (f) => f.type === 'select' && !f.option_list_id && (!f.options || f.options.length === 0)
+    );
+    if (invalidSelect) {
+      notifications.show({ message: t('manageServices.selectNeedsOptions'), color: 'red' });
+      return;
+    }
     setSaving(true);
     try {
-      // Normalize fields: strip _source, resolve option_list_id vs options
-      const fields = values.fields.map(({ _source, ...f }) => {
+      // Normalize fields: strip _source and _uid, resolve option_list_id vs options
+      const fields = values.fields.map(({ _source, _uid, ...f }) => {
         if (f.type !== 'select') {
           // Drop select-only props
           const { option_list_id, options, ...rest } = f;
@@ -139,7 +148,7 @@ export default function ManageServices() {
 
   const handleDelete = async (svc) => {
     const name = lang === 'ar' ? svc.name_ar : svc.name_en;
-    if (!window.confirm(`${name}?`)) return;
+    if (!window.confirm(t('manageServices.deleteConfirm'))) return;
     try {
       await deleteService(svc.id);
       notifications.show({ message: t('common.deleted'), color: 'green' });
@@ -251,7 +260,7 @@ export default function ManageServices() {
 
           <Stack gap="sm" mb="sm">
             {form.values.fields.map((field, index) => (
-              <Paper key={index} withBorder p="sm" radius="sm">
+              <Paper key={field._uid} withBorder p="sm" radius="sm">
                 <Group align="flex-start" wrap="wrap" gap="sm">
                   <TextInput
                     label={t('manageServices.fieldKey')}

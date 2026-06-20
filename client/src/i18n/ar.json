@@ -251,7 +251,9 @@
     "sharedList": "قائمة مشتركة",
     "inlineOptions": "خيارات مباشرة",
     "backToServices": "العودة للخدمات",
-    "fieldCount": "حقول"
+    "fieldCount": "حقول",
+    "deleteConfirm": "حذف هذه الخدمة؟",
+    "selectNeedsOptions": "حقل القائمة يحتاج قائمة مشتركة أو خيارًا واحدًا على الأقل"
   },
   "settings": {
     "title": "الإعدادات",
