@@ -262,7 +262,8 @@
     "presetValues": "القيم المسبقة",
     "presetCost": "التكلفة المسبقة",
     "noShortcuts": "لا توجد اختصارات بعد",
-    "deleteShortcutConfirm": "حذف هذا الاختصار؟"
+    "deleteShortcutConfirm": "حذف هذا الاختصار؟",
+    "presetsCount": "{{count}} قيمة مسبقة"
   },
   "settings": {
     "title": "الإعدادات",

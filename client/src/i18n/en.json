@@ -262,7 +262,8 @@
     "presetValues": "Preset values",
     "presetCost": "Preset cost",
     "noShortcuts": "No shortcuts yet",
-    "deleteShortcutConfirm": "Delete this shortcut?"
+    "deleteShortcutConfirm": "Delete this shortcut?",
+    "presetsCount": "{{count}} presets"
   },
   "settings": {
     "title": "Settings",

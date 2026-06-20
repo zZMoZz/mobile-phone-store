@@ -560,7 +560,7 @@ export default function ManageServices() {
                       </div>
                       {sc.preset_values && Object.keys(sc.preset_values).length > 0 && (
                         <Badge variant="light" size="xs">
-                          {Object.keys(sc.preset_values).length} presets
+                          {t('manageServices.presetsCount', { count: Object.keys(sc.preset_values).length })}
                         </Badge>
                       )}
                     </Group>
