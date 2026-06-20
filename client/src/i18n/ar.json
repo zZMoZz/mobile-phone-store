@@ -234,6 +234,25 @@
     },
     "noData": "لا توجد بيانات بعد"
   },
+  "manageServices": {
+    "title": "إدارة الخدمات",
+    "addService": "إضافة خدمة",
+    "newService": "خدمة جديدة",
+    "editService": "تعديل الخدمة",
+    "fields": "الحقول",
+    "addField": "إضافة حقل",
+    "fieldKey": "المعرّف",
+    "fieldType": "النوع",
+    "typeText": "نص",
+    "typeNumber": "رقم",
+    "typeSelect": "قائمة",
+    "required": "مطلوب",
+    "optionSource": "مصدر الخيارات",
+    "sharedList": "قائمة مشتركة",
+    "inlineOptions": "خيارات مباشرة",
+    "backToServices": "العودة للخدمات",
+    "fieldCount": "حقول"
+  },
   "settings": {
     "title": "الإعدادات",
     "storeNameEn": "اسم المتجر (بالإنجليزية)",

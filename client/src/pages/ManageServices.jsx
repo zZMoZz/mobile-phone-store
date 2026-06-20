@@ -1,0 +1,365 @@
+import { useEffect, useState } from 'react';
+import {
+  Title,
+  Stack,
+  Group,
+  Button,
+  Paper,
+  Table,
+  ActionIcon,
+  Text,
+  Modal,
+  TextInput,
+  Select,
+  Switch,
+  TagsInput,
+  SegmentedControl,
+  Center,
+  Divider,
+} from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
+import { IconPlus, IconEdit, IconTrash, IconArrowLeft } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { listServices, createService, updateService, deleteService } from '../api/services.js';
+import { listOptionLists } from '../api/optionLists.js';
+import { apiErrorMessage } from '../lib/apiError.js';
+
+const BLANK_FIELD = () => ({
+  key: '',
+  label_en: '',
+  label_ar: '',
+  type: 'text',
+  required: false,
+  // source: 'inline' | 'shared' — only used in the builder UI, not sent to backend
+  _source: 'inline',
+  option_list_id: null,
+  options: [],
+});
+
+export default function ManageServices() {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const navigate = useNavigate();
+
+  const [services, setServices] = useState([]);
+  const [optionLists, setOptionLists] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [opened, handlers] = useDisclosure(false);
+  const [saving, setSaving] = useState(false);
+
+  const form = useForm({
+    initialValues: {
+      name_en: '',
+      name_ar: '',
+      fields: [],
+    },
+    validate: {
+      name_en: (v) => (v.trim() ? null : t('lists.nameRequired')),
+      name_ar: (v) => (v.trim() ? null : t('lists.nameRequired')),
+    },
+  });
+
+  const load = () => {
+    listServices().then(setServices).catch(() => {});
+    listOptionLists().then(setOptionLists).catch(() => {});
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openNew = () => {
+    setEditing(null);
+    form.setValues({ name_en: '', name_ar: '', fields: [] });
+    handlers.open();
+  };
+
+  const openEdit = (svc) => {
+    setEditing(svc);
+    // Reconstruct _source for each field so the UI knows which toggle to show
+    const fields = (svc.fields || []).map((f) => ({
+      ...f,
+      _source: f.option_list_id != null ? 'shared' : 'inline',
+      option_list_id: f.option_list_id ?? null,
+      options: f.options ?? [],
+    }));
+    form.setValues({ name_en: svc.name_en, name_ar: svc.name_ar, fields });
+    handlers.open();
+  };
+
+  const addField = () => {
+    form.insertListItem('fields', BLANK_FIELD());
+  };
+
+  const removeField = (index) => {
+    form.removeListItem('fields', index);
+  };
+
+  const setFieldProp = (index, prop, value) => {
+    form.setFieldValue(`fields.${index}.${prop}`, value);
+  };
+
+  const submit = async (values) => {
+    setSaving(true);
+    try {
+      // Normalize fields: strip _source, resolve option_list_id vs options
+      const fields = values.fields.map(({ _source, ...f }) => {
+        if (f.type !== 'select') {
+          // Drop select-only props
+          const { option_list_id, options, ...rest } = f;
+          return rest;
+        }
+        if (_source === 'shared' && f.option_list_id != null) {
+          const { options, ...rest } = f;
+          return { ...rest, option_list_id: Number(f.option_list_id) };
+        }
+        // inline
+        const { option_list_id, ...rest } = f;
+        return { ...rest, options: f.options || [] };
+      });
+
+      const payload = { name_en: values.name_en, name_ar: values.name_ar, fields };
+
+      if (editing) await updateService(editing.id, payload);
+      else await createService(payload);
+
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      handlers.close();
+      load();
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (svc) => {
+    const name = lang === 'ar' ? svc.name_ar : svc.name_en;
+    if (!window.confirm(`${name}?`)) return;
+    try {
+      await deleteService(svc.id);
+      notifications.show({ message: t('common.deleted'), color: 'green' });
+      load();
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    }
+  };
+
+  const localizedName = (svc) => (lang === 'ar' ? svc.name_ar : svc.name_en);
+
+  const optionListData = optionLists.map((ol) => ({
+    value: String(ol.id),
+    label: lang === 'ar' ? ol.name_ar : ol.name_en,
+  }));
+
+  const typeData = [
+    { value: 'text', label: t('manageServices.typeText') },
+    { value: 'number', label: t('manageServices.typeNumber') },
+    { value: 'select', label: t('manageServices.typeSelect') },
+  ];
+
+  const sourceData = [
+    { value: 'shared', label: t('manageServices.sharedList') },
+    { value: 'inline', label: t('manageServices.inlineOptions') },
+  ];
+
+  return (
+    <Stack>
+      <Group justify="space-between">
+        <Title order={2}>{t('manageServices.title')}</Title>
+        <Group>
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate('/services')}>
+            {t('manageServices.backToServices')}
+          </Button>
+          <Button leftSection={<IconPlus size={18} />} onClick={openNew}>
+            {t('manageServices.addService')}
+          </Button>
+        </Group>
+      </Group>
+
+      <Paper withBorder radius="md">
+        <Table highlightOnHover verticalSpacing="sm">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>{t('services.nameEn')}</Table.Th>
+              <Table.Th>{t('services.nameAr')}</Table.Th>
+              <Table.Th>{t('manageServices.fields')}</Table.Th>
+              <Table.Th>{t('common.actions')}</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {services.map((svc) => (
+              <Table.Tr key={svc.id}>
+                <Table.Td>{svc.name_en}</Table.Td>
+                <Table.Td>{svc.name_ar}</Table.Td>
+                <Table.Td>
+                  <Text size="sm" c="dimmed">
+                    {(svc.fields || []).length} {t('manageServices.fieldCount')}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap={4} wrap="nowrap">
+                    <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(svc)}>
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+            {services.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={4}>
+                  <Center p="lg">
+                    <Text c="dimmed">{t('common.noResults')}</Text>
+                  </Center>
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      </Paper>
+
+      <Modal
+        opened={opened}
+        onClose={handlers.close}
+        title={editing ? t('manageServices.editService') : t('manageServices.newService')}
+        size="xl"
+      >
+        <form onSubmit={form.onSubmit(submit)}>
+          <TextInput
+            label={t('services.nameEn')}
+            required
+            {...form.getInputProps('name_en')}
+            mb="sm"
+          />
+          <TextInput
+            label={t('services.nameAr')}
+            required
+            dir="auto"
+            {...form.getInputProps('name_ar')}
+            mb="md"
+          />
+
+          <Divider label={t('manageServices.fields')} labelPosition="left" mb="sm" />
+
+          <Stack gap="sm" mb="sm">
+            {form.values.fields.map((field, index) => (
+              <Paper key={index} withBorder p="sm" radius="sm">
+                <Group align="flex-start" wrap="wrap" gap="sm">
+                  <TextInput
+                    label={t('manageServices.fieldKey')}
+                    value={field.key}
+                    onChange={(e) => setFieldProp(index, 'key', e.currentTarget.value)}
+                    style={{ flex: '1 1 120px', minWidth: 100 }}
+                  />
+                  <TextInput
+                    label={t('services.nameEn')}
+                    value={field.label_en}
+                    onChange={(e) => setFieldProp(index, 'label_en', e.currentTarget.value)}
+                    style={{ flex: '1 1 140px', minWidth: 100 }}
+                  />
+                  <TextInput
+                    label={t('services.nameAr')}
+                    value={field.label_ar}
+                    onChange={(e) => setFieldProp(index, 'label_ar', e.currentTarget.value)}
+                    dir="auto"
+                    style={{ flex: '1 1 140px', minWidth: 100 }}
+                  />
+                  <Select
+                    label={t('manageServices.fieldType')}
+                    data={typeData}
+                    value={field.type}
+                    onChange={(v) => setFieldProp(index, 'type', v)}
+                    allowDeselect={false}
+                    style={{ flex: '1 1 120px', minWidth: 100 }}
+                  />
+                  <Stack gap={4} justify="flex-end" style={{ paddingTop: 24 }}>
+                    <Switch
+                      label={t('manageServices.required')}
+                      checked={field.required}
+                      onChange={(e) => setFieldProp(index, 'required', e.currentTarget.checked)}
+                    />
+                  </Stack>
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    onClick={() => removeField(index)}
+                    style={{ alignSelf: 'flex-end', marginBottom: 2 }}
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+
+                {field.type === 'select' && (
+                  <Stack gap="xs" mt="sm">
+                    <Text size="xs" c="dimmed" fw={500}>
+                      {t('manageServices.optionSource')}
+                    </Text>
+                    <SegmentedControl
+                      data={sourceData}
+                      value={field._source}
+                      onChange={(v) => {
+                        setFieldProp(index, '_source', v);
+                        // Clear the other source when switching
+                        if (v === 'shared') {
+                          setFieldProp(index, 'options', []);
+                        } else {
+                          setFieldProp(index, 'option_list_id', null);
+                        }
+                      }}
+                      size="xs"
+                    />
+                    {field._source === 'shared' ? (
+                      <Select
+                        placeholder={t('manageServices.sharedList')}
+                        data={optionListData}
+                        value={field.option_list_id != null ? String(field.option_list_id) : null}
+                        onChange={(v) =>
+                          setFieldProp(index, 'option_list_id', v != null ? Number(v) : null)
+                        }
+                        clearable
+                      />
+                    ) : (
+                      <TagsInput
+                        placeholder={t('lists.optionsHint')}
+                        description={t('lists.optionsHint')}
+                        value={field.options || []}
+                        onChange={(v) => setFieldProp(index, 'options', v)}
+                      />
+                    )}
+                  </Stack>
+                )}
+              </Paper>
+            ))}
+          </Stack>
+
+          <Button
+            variant="light"
+            size="xs"
+            leftSection={<IconPlus size={14} />}
+            onClick={addField}
+            mb="md"
+          >
+            {t('manageServices.addField')}
+          </Button>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={handlers.close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={saving}>
+              {t('common.save')}
+            </Button>
+          </Group>
+        </form>
+      </Modal>
+    </Stack>
+  );
+}

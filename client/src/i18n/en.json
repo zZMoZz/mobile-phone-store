@@ -234,6 +234,25 @@
     },
     "noData": "No data yet"
   },
+  "manageServices": {
+    "title": "Manage Services",
+    "addService": "Add Service",
+    "newService": "New Service",
+    "editService": "Edit Service",
+    "fields": "Fields",
+    "addField": "Add Field",
+    "fieldKey": "Key",
+    "fieldType": "Type",
+    "typeText": "Text",
+    "typeNumber": "Number",
+    "typeSelect": "Dropdown",
+    "required": "Required",
+    "optionSource": "Options source",
+    "sharedList": "Shared list",
+    "inlineOptions": "Inline options",
+    "backToServices": "Back to Services",
+    "fieldCount": "fields"
+  },
   "settings": {
     "title": "Settings",
     "storeNameEn": "Store Name (English)",
