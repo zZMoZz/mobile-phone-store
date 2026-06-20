@@ -83,9 +83,7 @@ export default function Services() {
     );
     if (missing.length > 0) {
       notifications.show({
-        message: missing
-          .map((f) => (lang === 'ar' ? f.label_ar : f.label_en))
-          .join(', ') + ': ' + t('common.error'),
+        message: t('services.fieldRequired'),
         color: 'red',
       });
       return;
@@ -93,7 +91,7 @@ export default function Services() {
 
     const costNum = Number(cost);
     if (!costNum || costNum <= 0) {
-      notifications.show({ message: t('services.cost') + ': ' + t('common.error'), color: 'red' });
+      notifications.show({ message: t('services.costRequired'), color: 'red' });
       return;
     }
 

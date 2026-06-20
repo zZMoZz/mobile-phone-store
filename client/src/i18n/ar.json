@@ -147,7 +147,6 @@
     "fee": "رسوم الخدمة",
     "total": "الإجمالي",
     "profit": "الربح",
-    "serviceType": "نوع الخدمة",
     "note": "ملاحظة",
     "record": "تسجيل المعاملة",
     "recorded": "تم تسجيل المعاملة",
@@ -176,7 +175,9 @@
     "cost": "التكلفة",
     "recordWithoutShortcut": "تسجيل بدون اختصار",
     "recorded": "تم تسجيل الخدمة",
-    "noShortcuts": "لا توجد اختصارات بعد"
+    "noShortcuts": "لا توجد اختصارات بعد",
+    "fieldRequired": "يرجى ملء جميع الحقول المطلوبة",
+    "costRequired": "أدخل تكلفة أكبر من صفر"
   },
   "errors": {
     "product_name_required": "الاسم مطلوب",
@@ -189,7 +190,10 @@
     "ref_name_required": "الاسمان بالإنجليزية والعربية مطلوبان",
     "ref_name_taken": "يوجد عنصر بنفس الاسم بالفعل",
     "ref_in_use": "لا يمكن الحذف: مستخدم في {{n}} منتج",
-    "ref_protected": "هذا عنصر افتراضي ولا يمكن حذفه"
+    "ref_protected": "هذا عنصر افتراضي ولا يمكن حذفه",
+    "service_missing": "الخدمة غير موجودة",
+    "service_cost_positive": "التكلفة يجب أن تكون أكبر من صفر",
+    "service_field_required": "حقل مطلوب غير مكتمل"
   },
   "lists": {
     "title": "الأقسام والعلامات التجارية",

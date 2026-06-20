@@ -147,7 +147,6 @@
     "fee": "Service Fee",
     "total": "Total",
     "profit": "Profit",
-    "serviceType": "Service Type",
     "note": "Note",
     "record": "Record Transaction",
     "recorded": "Transaction recorded",
@@ -176,7 +175,9 @@
     "cost": "Cost",
     "recordWithoutShortcut": "Record without shortcut",
     "recorded": "Service recorded",
-    "noShortcuts": "No shortcuts yet"
+    "noShortcuts": "No shortcuts yet",
+    "fieldRequired": "Please fill all required fields",
+    "costRequired": "Enter a cost greater than 0"
   },
   "errors": {
     "product_name_required": "Name is required",
@@ -189,7 +190,10 @@
     "ref_name_required": "Both English and Arabic names are required",
     "ref_name_taken": "A record with this name already exists",
     "ref_in_use": "Can't delete: still used by {{n}} product(s)",
-    "ref_protected": "This is a default item and can't be deleted"
+    "ref_protected": "This is a default item and can't be deleted",
+    "service_missing": "Service not found",
+    "service_cost_positive": "Cost must be greater than 0",
+    "service_field_required": "A required field is missing"
   },
   "lists": {
     "title": "Categories & Brands",
