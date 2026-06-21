@@ -8,6 +8,7 @@ import {
   NavLink,
   ActionIcon,
   Select,
+  Text,
   Tooltip,
   Burger,
   useMantineColorScheme,
@@ -24,18 +25,14 @@ import {
   IconMoon,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
+  IconHistory,
+  IconUsers,
+  IconLogout,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from '../i18n/index.js';
 import { useSettings } from '../context/SettingsContext.jsx';
-
-const NAV_ITEMS = [
-  { to: '/', key: 'dashboard', icon: IconLayoutDashboard, end: true },
-  { to: '/inventory', key: 'inventory', icon: IconBox },
-  { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus },
-  { to: '/lists', key: 'lists', icon: IconTags },
-  { to: '/settings', key: 'settings', icon: IconSettings },
-];
+import { useAuth } from '../context/AuthContext.jsx';
 
 const COLLAPSE_KEY = 'store.sidebar-collapsed';
 
@@ -47,6 +44,7 @@ function HeaderControls() {
   const { t, i18n } = useTranslation();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const { setDirection } = useDirection();
+  const { user, logout } = useAuth();
 
   // Keep Mantine layout direction in sync with the active language.
   useEffect(() => {
@@ -72,6 +70,16 @@ function HeaderControls() {
           {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
         </ActionIcon>
       </Tooltip>
+      {user && (
+        <>
+          <Text size="sm" c="dimmed">{user.username}</Text>
+          <Tooltip label={t('auth.logout')}>
+            <ActionIcon variant="default" size="lg" onClick={logout}>
+              <IconLogout size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </>
+      )}
     </Group>
   );
 }
@@ -81,6 +89,7 @@ export default function AppLayout({ children }) {
   const { storeName } = useSettings();
   const location = useLocation();
   const { dir } = useDirection();
+  const { isAdmin } = useAuth();
 
   // Mobile: full show/hide. Desktop: shrink to an icon-only rail (persisted).
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false);
@@ -98,6 +107,16 @@ export default function AppLayout({ children }) {
   }, [location.pathname, closeMobile]);
 
   const tooltipSide = dir === 'rtl' ? 'left' : 'right';
+
+  const navItems = [
+    { to: '/', key: 'dashboard', icon: IconLayoutDashboard, end: true },
+    { to: '/inventory', key: 'inventory', icon: IconBox },
+    { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus },
+    { to: '/lists', key: 'lists', icon: IconTags },
+    { to: '/activity-log', key: 'activityLog', icon: IconHistory },
+    ...(isAdmin ? [{ to: '/users', key: 'users', icon: IconUsers }] : []),
+    { to: '/settings', key: 'settings', icon: IconSettings },
+  ];
 
   return (
     <AppShell
@@ -122,7 +141,7 @@ export default function AppLayout({ children }) {
 
       <AppShell.Navbar p={collapsed ? 'xs' : 'sm'}>
         <AppShell.Section grow>
-          {NAV_ITEMS.map(({ to, key, icon: Icon, end }) => {
+          {navItems.map(({ to, key, icon: Icon, end }) => {
             const active = end ? location.pathname === to : location.pathname.startsWith(to);
             const link = (
               <NavLink
