@@ -9,7 +9,18 @@
     "transactions": "Transactions",
     "services": "Services",
     "lists": "Categories & Brands",
-    "settings": "Settings"
+    "settings": "Settings",
+    "activityLog": "Activity Log",
+    "users": "Users"
+  },
+  "auth": {
+    "login": "Sign In",
+    "logout": "Sign Out",
+    "username": "Username",
+    "password": "Password",
+    "invalidCredentials": "Invalid username or password",
+    "adminOnly": "Admin only",
+    "sessionExpired": "Session expired. Please sign in again."
   },
   "common": {
     "search": "Search",
@@ -195,7 +206,14 @@
     "ref_protected": "This is a default item and can't be deleted",
     "service_missing": "Service not found",
     "service_cost_positive": "Cost must be greater than 0",
-    "service_field_required": "A required field is missing"
+    "service_field_required": "A required field is missing",
+    "auth_required": "Authentication required",
+    "auth_invalid": "Invalid or expired session",
+    "auth_forbidden": "Admin access required",
+    "user_username_required": "Username is required",
+    "user_username_taken": "This username is already taken",
+    "user_role_invalid": "Role must be admin or staff",
+    "user_last_admin": "Cannot remove the last admin account"
   },
   "lists": {
     "title": "Categories & Brands",
@@ -276,6 +294,34 @@
     "noShortcuts": "No shortcuts yet",
     "deleteShortcutConfirm": "Delete this shortcut?",
     "presetsCount": "{{count}} presets"
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "Add User",
+    "newUser": "New User",
+    "editUser": "Edit User",
+    "username": "Username",
+    "password": "Password",
+    "passwordHint": "Leave blank to keep current password",
+    "role": "Role",
+    "roleAdmin": "Admin",
+    "roleStaff": "Staff",
+    "createdAt": "Created",
+    "deleteConfirm": "Delete this user?",
+    "cannotDeleteSelf": "You cannot delete your own account",
+    "lastAdmin": "Cannot remove the last admin"
+  },
+  "activityLog": {
+    "title": "Activity Log",
+    "date": "Date",
+    "user": "User",
+    "action": "Action",
+    "entity": "Entity",
+    "detail": "Detail",
+    "filterAction": "Filter by action",
+    "filterUser": "Filter by user",
+    "allActions": "All actions",
+    "allUsers": "All users"
   },
   "settings": {
     "title": "Settings",

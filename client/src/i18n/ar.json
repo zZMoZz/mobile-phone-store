@@ -9,7 +9,18 @@
     "transactions": "المعاملات",
     "services": "الخدمات",
     "lists": "الأقسام والعلامات التجارية",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "activityLog": "سجل النشاط",
+    "users": "المستخدمون"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "invalidCredentials": "اسم المستخدم أو كلمة المرور غير صحيحة",
+    "adminOnly": "للمسؤول فقط",
+    "sessionExpired": "انتهت الجلسة. يرجى تسجيل الدخول مجدداً."
   },
   "common": {
     "search": "بحث",
@@ -195,7 +206,14 @@
     "ref_protected": "هذا عنصر افتراضي ولا يمكن حذفه",
     "service_missing": "الخدمة غير موجودة",
     "service_cost_positive": "التكلفة يجب أن تكون أكبر من صفر",
-    "service_field_required": "حقل مطلوب غير مكتمل"
+    "service_field_required": "حقل مطلوب غير مكتمل",
+    "auth_required": "مطلوب تسجيل الدخول",
+    "auth_invalid": "جلسة غير صالحة أو منتهية",
+    "auth_forbidden": "هذا الإجراء للمسؤول فقط",
+    "user_username_required": "اسم المستخدم مطلوب",
+    "user_username_taken": "اسم المستخدم مستخدم بالفعل",
+    "user_role_invalid": "يجب أن يكون الدور مسؤولاً أو موظفاً",
+    "user_last_admin": "لا يمكن حذف آخر حساب مسؤول"
   },
   "lists": {
     "title": "الأقسام والعلامات التجارية",
@@ -276,6 +294,34 @@
     "noShortcuts": "لا توجد اختصارات بعد",
     "deleteShortcutConfirm": "حذف هذا الاختصار؟",
     "presetsCount": "{{count}} قيمة مسبقة"
+  },
+  "users": {
+    "title": "المستخدمون",
+    "addUser": "إضافة مستخدم",
+    "newUser": "مستخدم جديد",
+    "editUser": "تعديل المستخدم",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "passwordHint": "اتركها فارغة للإبقاء على كلمة المرور الحالية",
+    "role": "الدور",
+    "roleAdmin": "مسؤول",
+    "roleStaff": "موظف",
+    "createdAt": "تاريخ الإنشاء",
+    "deleteConfirm": "حذف هذا المستخدم؟",
+    "cannotDeleteSelf": "لا يمكنك حذف حسابك الخاص",
+    "lastAdmin": "لا يمكن حذف آخر مسؤول"
+  },
+  "activityLog": {
+    "title": "سجل النشاط",
+    "date": "التاريخ",
+    "user": "المستخدم",
+    "action": "الإجراء",
+    "entity": "العنصر",
+    "detail": "التفاصيل",
+    "filterAction": "تصفية بالإجراء",
+    "filterUser": "تصفية بالمستخدم",
+    "allActions": "جميع الإجراءات",
+    "allUsers": "جميع المستخدمين"
   },
   "settings": {
     "title": "الإعدادات",
