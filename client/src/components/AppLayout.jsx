@@ -18,7 +18,6 @@ import {
   IconLayoutDashboard,
   IconBox,
   IconShoppingCartPlus,
-  IconReceipt,
   IconTags,
   IconSettings,
   IconSun,
@@ -34,7 +33,6 @@ const NAV_ITEMS = [
   { to: '/', key: 'dashboard', icon: IconLayoutDashboard, end: true },
   { to: '/inventory', key: 'inventory', icon: IconBox },
   { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus },
-  { to: '/transactions', key: 'transactions', icon: IconReceipt },
   { to: '/lists', key: 'lists', icon: IconTags },
   { to: '/settings', key: 'settings', icon: IconSettings },
 ];

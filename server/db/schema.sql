@@ -111,3 +111,25 @@ CREATE TABLE IF NOT EXISTS settings (
   backup_dir       TEXT NOT NULL DEFAULT '',
   low_stock_threshold INTEGER NOT NULL DEFAULT 3
 );
+
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL CHECK (role IN ('admin','staff')),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  username   TEXT NOT NULL,
+  action     TEXT NOT NULL,
+  entity     TEXT,
+  entity_id  INTEGER,
+  detail     TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user    ON activity_logs(user_id);

@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import { getDb } from './connection.js';
 import { migrate } from './migrate.js';
+import bcrypt from 'bcryptjs';
 
 const CATEGORIES = [
   { name_en: 'Headphones', name_ar: 'سماعات رأس' },
@@ -19,6 +20,12 @@ const BRANDS = [
   { name_en: 'Generic', name_ar: 'غير محدد' },
 ];
 
+function seedAdminUser(db) {
+  const count = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+  if (count > 0) return;
+  const hash = bcrypt.hashSync('admin123', 10);
+  db.prepare("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')").run(hash);
+}
 
 /** Inserts default reference data. Idempotent: skips when data already exists. */
 export function seed() {
@@ -99,6 +106,8 @@ export function seed() {
        VALUES (1, 'EGP', 'ar', 'light', 'Silver Store', 'متجر سيلفر', 3)`,
     ).run();
   }
+
+  seedAdminUser(db);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
