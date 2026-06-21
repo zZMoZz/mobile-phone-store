@@ -6,8 +6,8 @@ const ALLOWED = [
   'default_theme',
   'store_name_en',
   'store_name_ar',
-  'backup_dir',
   'low_stock_threshold',
+  'backup_interval_hours',
 ];
 
 export function get() {
@@ -23,7 +23,8 @@ export function update(patch) {
   for (const key of ALLOWED) {
     if (key in patch) {
       fields.push(`${key} = @${key}`);
-      params[key] = key === 'low_stock_threshold' ? Number(patch[key]) || 0 : patch[key];
+      const isInt = key === 'low_stock_threshold' || key === 'backup_interval_hours';
+      params[key] = isInt ? Number(patch[key]) || 0 : patch[key];
     }
   }
   if (fields.length) {
