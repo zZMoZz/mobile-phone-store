@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { SettingsProvider } from './context/SettingsContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -42,6 +42,7 @@ export default function App() {
                       }
                     />
                     <Route path="/activity-log" element={<ActivityLog />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </AppLayout>
               </SettingsProvider>

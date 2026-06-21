@@ -71,7 +71,7 @@ export default function Users() {
       close();
       load();
     } catch (err) {
-      notifications.show({ message: err.response?.data?.error || t('common.error'), color: 'red' });
+      notifications.show({ message: err.response?.data?.code ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') }) : (err.response?.data?.error || t('common.error')), color: 'red' });
     } finally {
       setSaving(false);
     }
@@ -88,7 +88,7 @@ export default function Users() {
       notifications.show({ message: t('common.deleted'), color: 'green' });
       load();
     } catch (err) {
-      notifications.show({ message: err.response?.data?.error || t('common.error'), color: 'red' });
+      notifications.show({ message: err.response?.data?.code ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') }) : (err.response?.data?.error || t('common.error')), color: 'red' });
     }
   };
 

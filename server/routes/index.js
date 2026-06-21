@@ -22,7 +22,6 @@ router.get('/health', (req, res) => {
 
 // Public — no auth required
 router.use('/auth', authRouter);
-router.use('/settings', settingsRouter);
 
 // All routes below require a valid JWT
 router.use(authenticate);
@@ -36,6 +35,7 @@ router.use('/brands', brandsRouter);
 router.use('/option-lists', optionListsRouter);
 router.use('/services', servicesRouter);
 router.use('/service-shortcuts', serviceShortcutsRouter);
+router.use('/settings', settingsRouter);
 router.use('/users', usersRouter);
 router.use('/activity-logs', activityLogsRouter);
 router.use('/', dataRouter); // /backup, /export/*.csv

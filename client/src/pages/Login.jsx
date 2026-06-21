@@ -9,7 +9,6 @@ import {
   PasswordInput,
   Button,
   Alert,
-  Text,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
