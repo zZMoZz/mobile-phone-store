@@ -4,13 +4,15 @@ import { requireAdmin } from '../middleware/requireAdmin.js';
 import { logActivity } from '../repositories/activityLogs.js';
 import { createBackup } from '../lib/backup.js';
 import { toCsv } from '../lib/csv.js';
+import * as settings from '../repositories/settings.js';
 
 const router = Router();
 
 // Trigger a database backup (copy of the SQLite file).
 router.post('/backup', requireAdmin, async (req, res, next) => {
   try {
-    const result = await createBackup();
+    const dir = req.body?.dir || settings.get()?.backup_dir || undefined;
+    const result = await createBackup(dir);
     logActivity({ userId: req.user.id, username: req.user.username, action: 'create_backup' });
     res.json({ ok: true, file: result.fileName });
   } catch (err) {
