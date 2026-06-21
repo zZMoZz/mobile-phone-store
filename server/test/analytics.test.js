@@ -66,15 +66,13 @@ describe('analytics, settings, and data export', () => {
   it('also copies the backup to the configured external folder', async () => {
     const externalDir = path.join(os.tmpdir(), `store-test-external-${randomUUID()}`);
     try {
-      await api.put('/api/settings').send({ backup_dir: externalDir });
-      const res = await api.post('/api/backup');
+      const res = await api.post('/api/backup').send({ dir: externalDir });
       expect(res.status).toBe(200);
       expect(fs.existsSync(path.join(externalDir, res.body.file))).toBe(true);
       // No stray temp files left behind by the temp+rename writes.
       expect(fs.readdirSync(externalDir).every((f) => !f.endsWith('.tmp'))).toBe(true);
     } finally {
       fs.rmSync(externalDir, { recursive: true, force: true });
-      await api.put('/api/settings').send({ backup_dir: '' });
     }
   });
 
