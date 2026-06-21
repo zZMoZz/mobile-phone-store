@@ -1,20 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import request from 'supertest';
 import { setupTestApp } from './helpers.js';
 
 describe('health + seed', () => {
-  let app;
+  let api;
   let db;
   let cleanup;
 
   beforeAll(async () => {
-    ({ app, db, cleanup } = await setupTestApp());
+    ({ api, db, cleanup } = await setupTestApp());
   });
 
   afterAll(() => cleanup());
 
   it('responds on /api/health', async () => {
-    const res = await request(app).get('/api/health');
+    const res = await api.get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
   });

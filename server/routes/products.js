@@ -3,6 +3,7 @@ import { getDb } from '../db/connection.js';
 import * as products from '../repositories/products.js';
 import { listByProduct, create as createTransaction } from '../repositories/transactions.js';
 import { uploadProductImage, uploadedUrl } from '../lib/upload.js';
+import { logActivity } from '../repositories/activityLogs.js';
 
 const router = Router();
 
@@ -74,6 +75,7 @@ router.post('/', (req, res) => {
     if (initialQty > 0) recordStockIn(product, initialQty);
     return products.getById(product.id);
   })();
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'create_product', entity: 'product', entityId: result.id, detail: { name: result.name } });
   res.status(201).json(result);
 });
 
@@ -96,6 +98,7 @@ router.post('/add-stock', (req, res) => {
     }
     return products.getById(product.id);
   })();
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'restock_product', entity: 'product', entityId: result.id, detail: { name: result.name, quantity: qty } });
   res.status(201).json(result);
 });
 
@@ -116,6 +119,7 @@ router.post('/:id/add-stock', (req, res) => {
     });
     return products.getById(product.id);
   })();
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'restock_product', entity: 'product', entityId: result.id, detail: { name: result.name, quantity: qty } });
   res.json(result);
 });
 
@@ -124,12 +128,15 @@ router.put('/:id', (req, res) => {
   products.assertValidProductInput(req.body, { id });
   const updated = products.update(id, req.body);
   if (!updated) return res.status(404).json({ error: 'Not found' });
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'update_product', entity: 'product', entityId: id, detail: { name: updated.name } });
   res.json(updated);
 });
 
 router.delete('/:id', (req, res) => {
-  const ok = products.remove(Number(req.params.id));
+  const id = Number(req.params.id);
+  const ok = products.remove(id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'delete_product', entity: 'product', entityId: id });
   res.status(204).end();
 });
 
@@ -141,6 +148,7 @@ router.post('/:id/image', (req, res, next) => {
       image_path: uploadedUrl(req.file.filename),
     });
     if (!updated) return res.status(404).json({ error: 'Not found' });
+    logActivity({ userId: req.user.id, username: req.user.username, action: 'update_product', entity: 'product', entityId: Number(req.params.id) });
     res.json(updated);
   });
 });

@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import request from 'supertest';
 import { setupTestApp } from './helpers.js';
 
 describe('services backend', () => {
-  let app;
+  let api;
   let db;
   let cleanup;
 
   beforeAll(async () => {
-    ({ app, db, cleanup } = await setupTestApp());
+    ({ api, db, cleanup } = await setupTestApp());
   });
 
   afterAll(() => cleanup());
@@ -24,7 +23,7 @@ describe('services backend', () => {
   });
 
   it('creates a service with validated fields', async () => {
-    const res = await request(app)
+    const res = await api
       .post('/api/services')
       .send({
         name_en: 'Top-up',
@@ -41,14 +40,14 @@ describe('services backend', () => {
   });
 
   it('rejects an invalid field type', async () => {
-    const res = await request(app)
+    const res = await api
       .post('/api/services')
       .send({ name_en: 'Bad', name_ar: 'سيئ', fields: [{ key: 'x', label_en: 'X', label_ar: 'س', type: 'date' }] });
     expect(res.status).toBe(400);
   });
 
   it('rejects duplicate field keys', async () => {
-    const res = await request(app)
+    const res = await api
       .post('/api/services')
       .send({
         name_en: 'Dup',
@@ -62,22 +61,22 @@ describe('services backend', () => {
   });
 
   it('rejects a select field with neither an option list nor inline options', async () => {
-    const res = await request(app)
+    const res = await api
       .post('/api/services')
       .send({ name_en: 'NoOpts', name_ar: 'بدون', fields: [{ key: 's', label_en: 'S', label_ar: 'س', type: 'select' }] });
     expect(res.status).toBe(400);
   });
 
   it('seeds default services and a Providers option list', async () => {
-    const services = await request(app).get('/api/services');
+    const services = await api.get('/api/services');
     expect(services.body.map((s) => s.name_en)).toEqual(expect.arrayContaining(['Top-up', 'Bill Payment', 'Maintenance']));
 
-    const lists = await request(app).get('/api/option-lists');
+    const lists = await api.get('/api/option-lists');
     const providers = lists.body.find((l) => l.name_en === 'Providers');
     expect(providers).toBeDefined();
     expect(providers.options).toEqual(expect.arrayContaining(['Vodafone', 'WE', 'Orange', 'E&']));
 
-    const shortcuts = await request(app).get('/api/service-shortcuts');
+    const shortcuts = await api.get('/api/service-shortcuts');
     expect(shortcuts.body.length).toBeGreaterThan(0);
   });
 });

@@ -1,4 +1,8 @@
 import { Router } from 'express';
+import { authenticate } from '../middleware/authenticate.js';
+import authRouter from './auth.js';
+import usersRouter from './users.js';
+import activityLogsRouter from './activityLogs.js';
 import productsRouter from './products.js';
 import transactionsRouter from './transactions.js';
 import serviceTypesRouter from './serviceTypes.js';
@@ -16,6 +20,12 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Public — must be before authenticate
+router.use('/auth', authRouter);
+
+// All routes below require a valid JWT
+router.use(authenticate);
+
 router.use('/products', productsRouter);
 router.use('/transactions', transactionsRouter);
 router.use('/service-types', serviceTypesRouter);
@@ -26,6 +36,8 @@ router.use('/brands', brandsRouter);
 router.use('/option-lists', optionListsRouter);
 router.use('/services', servicesRouter);
 router.use('/service-shortcuts', serviceShortcutsRouter);
+router.use('/users', usersRouter);
+router.use('/activity-logs', activityLogsRouter);
 router.use('/', dataRouter); // /backup, /export/*.csv
 
 export default router;

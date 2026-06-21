@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as transactions from '../repositories/transactions.js';
+import { logActivity } from '../repositories/activityLogs.js';
 
 const router = Router();
 
@@ -14,7 +15,9 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  res.status(201).json(transactions.create(req.body));
+  const result = transactions.create(req.body);
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'record_transaction', entity: 'transaction', entityId: result.id, detail: { type: result.type } });
+  res.status(201).json(result);
 });
 
 export default router;

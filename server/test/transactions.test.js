@@ -1,28 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import request from 'supertest';
 import { setupTestApp } from './helpers.js';
 
 describe('transactions API', () => {
-  let app;
+  let api;
   let cleanup;
 
   beforeAll(async () => {
-    ({ app, cleanup } = await setupTestApp());
+    ({ api, cleanup } = await setupTestApp());
   });
 
   afterAll(() => cleanup());
 
   // Manual product creation now requires a category and brand (seeded id 1).
   const createProduct = (body) =>
-    request(app)
+    api
       .post('/api/products')
       .send({ category_id: 1, brand_id: 1, ...body })
       .then((r) => r.body);
-  const getProduct = (id) => request(app).get(`/api/products/${id}`).then((r) => r.body);
+  const getProduct = (id) => api.get(`/api/products/${id}`).then((r) => r.body);
 
   it('purchase increases stock and records expense (no profit)', async () => {
     const p = await createProduct({ name: 'Cable', buying_price: 50, selling_price: 90, quantity: 2 });
-    const res = await request(app)
+    const res = await api
       .post('/api/transactions')
       .send({ type: 'purchase', items: [{ product_id: p.id, quantity: 10, unit_price: 45 }] });
     expect(res.status).toBe(201);
@@ -35,7 +34,7 @@ describe('transactions API', () => {
 
   it('sale decreases stock and computes profit from cost snapshot', async () => {
     const p = await createProduct({ name: 'Earbuds', buying_price: 100, selling_price: 180, quantity: 5 });
-    const res = await request(app)
+    const res = await api
       .post('/api/transactions')
       .send({ type: 'sale', items: [{ product_id: p.id, quantity: 2 }] });
     expect(res.status).toBe(201);
@@ -49,7 +48,7 @@ describe('transactions API', () => {
 
   it('sale honors an overridden unit price', async () => {
     const p = await createProduct({ name: 'Used Phone', buying_price: 1000, selling_price: 1500, quantity: 1 });
-    const res = await request(app)
+    const res = await api
       .post('/api/transactions')
       .send({ type: 'sale', items: [{ product_id: p.id, quantity: 1, unit_price: 1400 }] });
     expect(res.body.total).toBe(1400);
@@ -57,7 +56,7 @@ describe('transactions API', () => {
   });
 
   it('quick-adds an unregistered item during a sale without negative stock', async () => {
-    const res = await request(app)
+    const res = await api
       .post('/api/transactions')
       .send({
         type: 'sale',
@@ -74,14 +73,14 @@ describe('transactions API', () => {
   });
 
   it('records a pure-revenue service transaction (total = cost, no profit)', async () => {
-    const svc = await request(app)
+    const svc = await api
       .post('/api/services')
       .send({
         name_en: 'Top-up',
         name_ar: 'شحن',
         fields: [{ key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'text', required: true }],
       });
-    const res = await request(app)
+    const res = await api
       .post('/api/transactions')
       .send({ type: 'service', service_id: svc.body.id, cost: 100, field_values: { provider: 'Vodafone' } });
     expect(res.status).toBe(201);
@@ -96,45 +95,45 @@ describe('transactions API', () => {
   });
 
   it('rejects a service transaction missing a required field', async () => {
-    const svc = await request(app)
+    const svc = await api
       .post('/api/services')
       .send({
         name_en: 'Bill',
         name_ar: 'فاتورة',
         fields: [{ key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'text', required: true }],
       });
-    const res = await request(app)
+    const res = await api
       .post('/api/transactions')
       .send({ type: 'service', service_id: svc.body.id, cost: 50, field_values: {} });
     expect(res.status).toBe(400);
   });
 
   it('rejects a service transaction with non-positive cost', async () => {
-    const svc = await request(app).post('/api/services').send({ name_en: 'Maint', name_ar: 'صيانة', fields: [] });
-    const res = await request(app)
+    const svc = await api.post('/api/services').send({ name_en: 'Maint', name_ar: 'صيانة', fields: [] });
+    const res = await api
       .post('/api/transactions')
       .send({ type: 'service', service_id: svc.body.id, cost: 0 });
     expect(res.status).toBe(400);
   });
 
   it('lists transactions and fetches one with items', async () => {
-    const list = await request(app).get('/api/transactions').query({ type: 'sale' });
+    const list = await api.get('/api/transactions').query({ type: 'sale' });
     expect(list.body.items.length).toBeGreaterThan(0);
     expect(list.body.items.every((t) => t.type === 'sale')).toBe(true);
 
-    const one = await request(app).get(`/api/transactions/${list.body.items[0].id}`);
+    const one = await api.get(`/api/transactions/${list.body.items[0].id}`);
     expect(one.status).toBe(200);
     expect(Array.isArray(one.body.items)).toBe(true);
   });
 
   it('rejects an unknown transaction type', async () => {
-    const res = await request(app).post('/api/transactions').send({ type: 'gift', items: [] });
+    const res = await api.post('/api/transactions').send({ type: 'gift', items: [] });
     expect(res.status).toBe(400);
   });
 
   it('product history reflects recorded transactions', async () => {
     const p = await createProduct({ name: 'Tracked', buying_price: 10, selling_price: 20, quantity: 5 });
-    await request(app).post('/api/transactions').send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] });
+    await api.post('/api/transactions').send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] });
     const detail = await getProduct(p.id);
     // Initial stock (5) is recorded as a purchase, then the sale — newest first.
     expect(detail.history.length).toBe(2);
