@@ -54,7 +54,7 @@ export default function Settings() {
   const defaultNameEn = i18n.getFixedT('en')('app.title');
   const defaultNameAr = i18n.getFixedT('ar')('app.title');
   const { setSettings } = useSettings();
-  const { setColorScheme } = useMantineColorScheme();
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
   const { isAdmin, user: currentUser } = useAuth();
 
   // Settings state
@@ -328,7 +328,7 @@ export default function Settings() {
           <Divider />
           <Table highlightOnHover verticalSpacing="sm">
             <Table.Thead>
-              <Table.Tr>
+              <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
                 <Table.Th>{t('users.username')}</Table.Th>
                 <Table.Th>{t('users.role')}</Table.Th>
                 <Table.Th>{t('users.createdAt')}</Table.Th>
