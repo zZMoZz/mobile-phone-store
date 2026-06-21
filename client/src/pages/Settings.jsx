@@ -130,9 +130,9 @@ export default function Settings() {
   };
 
   const backup = async () => {
-    setBackingUp(true);
     try {
       const dir = await pickFolder();
+      setBackingUp(true);
       const res = await createBackup(dir || undefined);
       notifications.show({ message: `${t('settings.backupDone')}: ${res.file}`, color: 'green' });
     } catch {
@@ -217,12 +217,14 @@ export default function Settings() {
         <Stack>
           <Group grow>
             <TextInput
+              size="md"
               label={t('settings.storeNameEn')}
               placeholder={defaultNameEn}
               value={values.store_name_en || ''}
               onChange={set('store_name_en')}
             />
             <TextInput
+              size="md"
               label={t('settings.storeNameAr')}
               dir="auto"
               placeholder={defaultNameAr}
@@ -231,6 +233,7 @@ export default function Settings() {
             />
           </Group>
           <Select
+            size="md"
             label={t('settings.defaultLanguage')}
             data={[
               { value: 'ar', label: 'العربية' },
@@ -241,6 +244,7 @@ export default function Settings() {
             allowDeselect={false}
           />
           <Select
+            size="md"
             label={t('settings.defaultTheme')}
             data={[
               { value: 'light', label: t('settings.themeLight') },
@@ -251,6 +255,7 @@ export default function Settings() {
             allowDeselect={false}
           />
           <NumberInput
+            size="md"
             label={t('settings.lowStockThreshold')}
             min={0}
             value={values.low_stock_threshold}
@@ -270,11 +275,12 @@ export default function Settings() {
 
       {isAdmin && (
         <Paper withBorder p="lg" radius="md">
-          <Text fw={600} mb="xs">
+          <Text fw={600} fz="md" mb="xs">
             {t('settings.data')}
           </Text>
           <Divider mb="md" />
           <NumberInput
+            size="md"
             label={t('settings.backupIntervalHours')}
             description={t('settings.backupIntervalHint')}
             min={1}
@@ -288,7 +294,7 @@ export default function Settings() {
           <SimpleGrid cols={{ base: 1, xs: 3 }}>
             <Button
               variant="default"
-              size="sm"
+              size="md"
               leftSection={<IconDatabaseExport size={18} />}
               loading={backingUp}
               onClick={backup}
@@ -297,7 +303,7 @@ export default function Settings() {
             </Button>
             <Button
               variant="default"
-              size="sm"
+              size="md"
               leftSection={<IconFileExport size={18} />}
               loading={exportingProducts}
               onClick={() => downloadCsv('/export/products.csv', 'products.csv', setExportingProducts)}
@@ -306,7 +312,7 @@ export default function Settings() {
             </Button>
             <Button
               variant="default"
-              size="sm"
+              size="md"
               leftSection={<IconFileExport size={18} />}
               loading={exportingTransactions}
               onClick={() => downloadCsv('/export/transactions.csv', 'transactions.csv', setExportingTransactions)}
@@ -320,13 +326,13 @@ export default function Settings() {
       {isAdmin && (
         <Paper withBorder radius="md">
           <Group justify="space-between" align="center" p="lg" pb="xs">
-            <Text fw={600}>{t('users.title')}</Text>
-            <Button size="xs" leftSection={<IconPlus size={14} />} onClick={openNew}>
+            <Text fw={600} fz="md">{t('users.title')}</Text>
+            <Button size="sm" leftSection={<IconPlus size={14} />} onClick={openNew}>
               {t('users.addUser')}
             </Button>
           </Group>
           <Divider />
-          <Table highlightOnHover verticalSpacing="sm">
+          <Table highlightOnHover verticalSpacing="md" fz="md">
             <Table.Thead>
               <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
                 <Table.Th>{t('users.username')}</Table.Th>
@@ -385,12 +391,14 @@ export default function Settings() {
       >
         <Stack gap="sm">
           <TextInput
+            size="md"
             label={t('users.username')}
             value={username}
             onChange={(e) => setUsername(e.currentTarget.value)}
             required
           />
           <PasswordInput
+            size="md"
             label={t('users.password')}
             description={editing ? t('users.passwordHint') : undefined}
             value={password}
@@ -398,6 +406,7 @@ export default function Settings() {
             required={!editing}
           />
           <Select
+            size="md"
             label={t('users.role')}
             value={role}
             onChange={(v) => v && setRole(v)}
