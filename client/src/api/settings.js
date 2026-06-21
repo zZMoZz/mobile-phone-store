@@ -10,11 +10,17 @@ export async function updateSettings(body) {
   return data;
 }
 
-export async function createBackup() {
-  const { data } = await api.post('/backup');
+export async function createBackup(dir) {
+  const { data } = await api.post('/backup', dir ? { dir } : {});
   return data;
 }
 
-// CSV exports are plain downloads; build absolute URLs for <a href> / window.open.
-export const exportProductsUrl = '/api/export/products.csv';
-export const exportTransactionsUrl = '/api/export/transactions.csv';
+export async function pickFolder() {
+  const { data } = await api.get('/settings/folder-picker');
+  return data.path; // string or null if cancelled
+}
+
+export async function exportCsv(path) {
+  const { data } = await api.get(path, { responseType: 'blob' });
+  return data;
+}
