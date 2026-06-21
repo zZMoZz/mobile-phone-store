@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { authenticate } from '../middleware/authenticate.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import * as users from '../repositories/users.js';
 import { logActivity } from '../repositories/activityLogs.js';
 
 const router = Router();
 
-// All routes require auth + admin
-router.use(authenticate, requireAdmin);
+// All routes require admin (auth handled by global middleware)
+router.use(requireAdmin);
 
 router.get('/', (req, res, next) => {
   try { res.json(users.list()); } catch (err) { next(err); }

@@ -1,10 +1,7 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/authenticate.js';
 import { listActivity } from '../repositories/activityLogs.js';
 
 const router = Router();
-
-router.use(authenticate);
 
 router.get('/', (req, res, next) => {
   try {

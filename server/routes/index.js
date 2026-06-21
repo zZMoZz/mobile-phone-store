@@ -20,8 +20,9 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Public — must be before authenticate
+// Public — no auth required
 router.use('/auth', authRouter);
+router.use('/settings', settingsRouter);
 
 // All routes below require a valid JWT
 router.use(authenticate);
@@ -30,7 +31,6 @@ router.use('/products', productsRouter);
 router.use('/transactions', transactionsRouter);
 router.use('/service-types', serviceTypesRouter);
 router.use('/analytics', analyticsRouter);
-router.use('/settings', settingsRouter);
 router.use('/categories', categoriesRouter);
 router.use('/brands', brandsRouter);
 router.use('/option-lists', optionListsRouter);
