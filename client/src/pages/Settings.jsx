@@ -10,6 +10,7 @@ import {
   Button,
   Divider,
   Text,
+  Tooltip,
 } from '@mantine/core';
 import { useMantineColorScheme } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -24,6 +25,7 @@ import {
 } from '../api/settings.js';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { setLanguage } from '../i18n/index.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
@@ -36,6 +38,7 @@ export default function Settings() {
   const [values, setValues] = useState(null);
   const [saving, setSaving] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     getSettings().then(setValues);
@@ -129,48 +132,54 @@ export default function Settings() {
             onChange={set('backup_dir')}
           />
           <Group justify="flex-end">
-            <Button leftSection={<IconDeviceFloppy size={18} />} loading={saving} onClick={save}>
-              {t('common.save')}
-            </Button>
+            <Tooltip label={t('auth.adminOnly')} disabled={isAdmin}>
+              <span>
+                <Button leftSection={<IconDeviceFloppy size={18} />} loading={saving} onClick={save} disabled={!isAdmin}>
+                  {t('common.save')}
+                </Button>
+              </span>
+            </Tooltip>
           </Group>
         </Stack>
       </Paper>
 
-      <Paper withBorder p="lg" radius="md">
-        <Text fw={600} mb="xs">
-          {t('settings.data')}
-        </Text>
-        <Divider mb="md" />
-        <Group grow wrap="nowrap">
-          <Button
-            variant="default"
-            size="sm"
-            leftSection={<IconDatabaseExport size={18} />}
-            loading={backingUp}
-            onClick={backup}
-          >
-            {t('settings.backup')}
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            leftSection={<IconFileExport size={18} />}
-            component="a"
-            href={exportProductsUrl}
-          >
-            {t('settings.exportProducts')}
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            leftSection={<IconFileExport size={18} />}
-            component="a"
-            href={exportTransactionsUrl}
-          >
-            {t('settings.exportTransactions')}
-          </Button>
-        </Group>
-      </Paper>
+      {isAdmin && (
+        <Paper withBorder p="lg" radius="md">
+          <Text fw={600} mb="xs">
+            {t('settings.data')}
+          </Text>
+          <Divider mb="md" />
+          <Group grow wrap="nowrap">
+            <Button
+              variant="default"
+              size="sm"
+              leftSection={<IconDatabaseExport size={18} />}
+              loading={backingUp}
+              onClick={backup}
+            >
+              {t('settings.backup')}
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              leftSection={<IconFileExport size={18} />}
+              component="a"
+              href={exportProductsUrl}
+            >
+              {t('settings.exportProducts')}
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              leftSection={<IconFileExport size={18} />}
+              component="a"
+              href={exportTransactionsUrl}
+            >
+              {t('settings.exportTransactions')}
+            </Button>
+          </Group>
+        </Paper>
+      )}
     </Stack>
   );
 }

@@ -42,6 +42,7 @@ import { formatMoney, formatNumber, periodStart } from '../lib/format.js';
 import { productImage, productCategoryName, productBrandName, refName } from '../lib/display.js';
 import ProductFormModal from '../components/ProductFormModal.jsx';
 import AddProductModal from '../components/AddProductModal.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 15;
 
@@ -80,6 +81,7 @@ export default function Inventory() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const { categories, brands, reload: reloadRef } = useReference();
 
   const [search, setSearch] = useState('');
@@ -462,6 +464,7 @@ export default function Inventory() {
                 <Table.Th>{t('inventory.columns.brand')}</Table.Th>
                 <Table.Th>{t('inventory.columns.quantity')}</Table.Th>
                 <Table.Th>{t('inventory.columns.sellingPrice')}</Table.Th>
+                <Table.Th>{t('inventory.columns.buyingPrice')}</Table.Th>
                 <Table.Th>{t('common.actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -502,6 +505,11 @@ export default function Inventory() {
                       {formatMoney(p.selling_price, lang)}
                     </Text>
                   </Table.Td>
+                  <Table.Td onClick={open}>
+                    <Text fw={700} size="md" style={!isAdmin ? { filter: 'blur(4px)', userSelect: 'none' } : undefined}>
+                      {formatMoney(p.buying_price, lang)}
+                    </Text>
+                  </Table.Td>
                   <Table.Td>
                     <Group gap={4} wrap="nowrap">
                       <ActionIcon variant="subtle" onClick={() => navigate(`/inventory/${p.id}`)}>
@@ -528,7 +536,7 @@ export default function Inventory() {
               })}
               {!loading && data.items.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={7}>
+                  <Table.Td colSpan={8}>
                     <Center p="lg">
                       <Text c="dimmed">{t('common.noResults')}</Text>
                     </Center>

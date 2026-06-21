@@ -30,6 +30,7 @@ import { lookupByBarcode } from '../api/products.js';
 import { listTransactions, getTransaction, createTransaction } from '../api/transactions.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
 import ServiceRecorder from '../components/ServiceRecorder.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 20;
 const typeColor = (type) => (type === 'sale' ? 'blue' : type === 'purchase' ? 'teal' : 'grape');
@@ -41,6 +42,7 @@ export default function NewTransaction() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
 
   // --- New transaction form ---
   const [type, setType] = useState('sale');
@@ -260,12 +262,18 @@ export default function NewTransaction() {
                     </Table.Td>
                     {type !== 'purchase' && (
                       <Table.Td>
-                        <NumberInput
-                          min={0}
-                          value={l.unit_cost}
-                          onChange={(v) => updateLine(l.key, { unit_cost: v })}
-                          hideControls
-                        />
+                        {isAdmin ? (
+                          <NumberInput
+                            min={0}
+                            value={l.unit_cost}
+                            onChange={(v) => updateLine(l.key, { unit_cost: v })}
+                            hideControls
+                          />
+                        ) : (
+                          <Text style={{ filter: 'blur(4px)', userSelect: 'none' }}>
+                            {formatMoney(l.unit_cost, lang)}
+                          </Text>
+                        )}
                       </Table.Td>
                     )}
                     <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>

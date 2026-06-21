@@ -23,14 +23,15 @@ import { useReference } from '../hooks/useReference.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
 import { productImage, productCategoryName, productBrandName } from '../lib/display.js';
 import ProductFormModal from '../components/ProductFormModal.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
-function Field({ label, value, size = 'md', fw = 500 }) {
+function Field({ label, value, size = 'md', fw = 500, blurred = false }) {
   return (
     <div>
       <Text size="xs" c="dimmed">
         {label}
       </Text>
-      <Text size={size} fw={fw}>
+      <Text size={size} fw={fw} style={blurred ? { filter: 'blur(4px)', userSelect: 'none' } : undefined}>
         {value ?? '—'}
       </Text>
     </div>
@@ -46,6 +47,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [formOpened, formHandlers] = useDisclosure(false);
+  const { isAdmin } = useAuth();
 
   const load = async () => {
     setLoading(true);
@@ -114,6 +116,7 @@ export default function ProductDetail() {
                 value={formatMoney(product.buying_price, lang)}
                 size="xl"
                 fw={700}
+                blurred={!isAdmin}
               />
               <Field label={t('product.category')} value={productCategoryName(product, lang)} />
               <Field label={t('product.brand')} value={productBrandName(product, lang)} />
