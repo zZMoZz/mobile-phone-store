@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getDb } from '../db/connection.js';
-import { get as getSettings } from '../repositories/settings.js';
 import { BACKUPS_DIR, ensureDataDirs } from '../db/paths.js';
 
 const PREFIX = 'store-backup-';
@@ -45,13 +44,11 @@ async function writeBackupTo(dir, fileName) {
 }
 
 /**
- * Creates a consistent copy of the SQLite database under the local backups dir
- * using better-sqlite3's online backup. If an external backup folder is configured
- * (Settings → backup_dir, e.g. a Google-Drive-synced path), the finished backup is
- * also copied there (best-effort). Old backups in each folder are pruned.
- * Returns { fileName, path } of the local backup.
+ * Creates a consistent copy of the SQLite database under the local backups dir.
+ * If `extraDir` is provided the finished backup is also copied there (best-effort).
+ * Old backups in each folder are pruned. Returns { fileName, path } of the local backup.
  */
-export async function createBackup() {
+export async function createBackup(extraDir) {
   ensureDataDirs();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const fileName = `${PREFIX}${stamp}.db`;
@@ -59,18 +56,19 @@ export async function createBackup() {
   const localPath = await writeBackupTo(BACKUPS_DIR, fileName);
   pruneBackups(BACKUPS_DIR);
 
-  // Off-machine copy: only when configured and pointing somewhere new.
-  const externalDir = (getSettings()?.backup_dir || '').trim();
-  if (externalDir && path.resolve(externalDir) !== path.resolve(BACKUPS_DIR)) {
-    try {
-      fs.mkdirSync(externalDir, { recursive: true });
-      const extDest = path.join(externalDir, fileName);
-      const extTmp = `${extDest}.tmp`;
-      fs.copyFileSync(localPath, extTmp);
-      fs.renameSync(extTmp, extDest);
-      pruneBackups(externalDir);
-    } catch (err) {
-      console.warn(`Backup: could not copy to external folder "${externalDir}":`, err.message);
+  if (extraDir) {
+    const resolved = path.resolve(extraDir);
+    if (resolved !== path.resolve(BACKUPS_DIR)) {
+      try {
+        fs.mkdirSync(extraDir, { recursive: true });
+        const extDest = path.join(extraDir, fileName);
+        const extTmp = `${extDest}.tmp`;
+        fs.copyFileSync(localPath, extTmp);
+        fs.renameSync(extTmp, extDest);
+        pruneBackups(extraDir);
+      } catch (err) {
+        console.warn(`Backup: could not copy to "${extraDir}":`, err.message);
+      }
     }
   }
 
