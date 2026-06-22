@@ -334,11 +334,16 @@
     "lowStockThreshold": "Low Stock Threshold",
     "backupIntervalHours": "Automatic Backup Interval (hours)",
     "backupIntervalHint": "Minimum 1 hour. Changes take effect immediately without restarting.",
-    "backupInfo": "Backups run automatically on app start, before each login, and every {{hours}} hours. The 30 most recent backups are kept per folder — older ones are deleted automatically.",
+    "backupInfo1": "Backups run automatically before each login, after each logout (including closing the browser), and every {{hours}} hours.",
+    "backupInfo2": "The 50 most recent backups are kept — older ones are deleted automatically.",
+    "backupInfo3": "\"Create Backup\" saves a copy both in the app's local backup folder and in the location you choose.",
     "data": "Data",
     "backup": "Create Backup",
     "backupDone": "Backup created",
     "exportProducts": "Export Products",
-    "exportTransactions": "Export Transactions"
+    "exportTransactions": "Export Transactions",
+    "exportInfo1": "Exports two files: English (products.csv) and Arabic (products-ar.csv).",
+    "exportInfo2": "Category and brand names appear in the matching language in each file.",
+    "exportInfo3": "Both files download automatically to your Downloads folder."
   }
 }
