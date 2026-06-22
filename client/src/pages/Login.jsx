@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Center,
   Stack,
@@ -9,6 +9,8 @@ import {
   PasswordInput,
   Button,
   Alert,
+  Anchor,
+  Text,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -78,6 +80,11 @@ export default function Login() {
               <Button type="submit" fullWidth mt="xs" loading={loading}>
                 {t('auth.login')}
               </Button>
+              <Text ta="center" size="sm">
+                <Anchor component={Link} to="/forgot-password">
+                  {t('auth.forgotPassword')}
+                </Anchor>
+              </Text>
             </Stack>
           </form>
         </Paper>
