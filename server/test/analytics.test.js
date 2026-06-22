@@ -105,15 +105,6 @@ describe('analytics, settings, and data export', () => {
     expect(txns.text).toContain('Type');
   });
 
-  it('exports products CSV in Arabic', async () => {
-    const res = await api.get('/api/export/products.csv?lang=ar');
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toMatch(/text\/csv/);
-    expect(res.headers['content-disposition']).toContain('products-ar.csv');
-    expect(res.text).toContain('الاسم');
-    expect(res.text).toContain('الفئة');
-  });
-
   it('counts service money as revenue but not as profit', async () => {
     const svc = await api.post('/api/services').send({ name_en: 'Recharge', name_ar: 'شحن', fields: [] });
     const before = await api.get('/api/analytics');
