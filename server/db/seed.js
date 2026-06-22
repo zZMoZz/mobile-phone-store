@@ -24,7 +24,10 @@ function seedAdminUser(db) {
   const count = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
   if (count > 0) return;
   const hash = bcrypt.hashSync('admin123', 10);
-  db.prepare("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')").run(hash);
+  db.prepare(
+    `INSERT INTO users (username, display_name, password_hash, role, force_password_change)
+     VALUES ('admin', 'Administrator', ?, 'owner', 1)`
+  ).run(hash);
 }
 
 /** Inserts default reference data. Idempotent: skips when data already exists. */

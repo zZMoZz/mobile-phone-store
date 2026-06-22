@@ -52,6 +52,38 @@ function applyColumnMigrations(db) {
   if (!txnCols.includes('service_data')) {
     db.exec('ALTER TABLE transactions ADD COLUMN service_data TEXT');
   }
+
+  // Users: full table recreation to add new columns and update role CHECK constraint.
+  // Triggered by the absence of token_version (added in the auth overhaul).
+  const usersCols = columns('users');
+  if (!usersCols.includes('token_version')) {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users_new (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        username              TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        display_name          TEXT,
+        password_hash         TEXT NOT NULL,
+        role                  TEXT NOT NULL CHECK (role IN ('owner','admin','staff')),
+        status                TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','DISABLED')),
+        force_password_change INTEGER NOT NULL DEFAULT 0,
+        token_version         INTEGER NOT NULL DEFAULT 0,
+        recovery_code_hash    TEXT,
+        created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    db.exec(`
+      INSERT INTO users_new (id, username, display_name, password_hash, role, status,
+                             force_password_change, token_version, recovery_code_hash, created_at)
+      SELECT id, username, NULL, password_hash,
+             CASE WHEN role IN ('owner','admin','staff') THEN role ELSE 'staff' END,
+             'ACTIVE', 0, 0, NULL, created_at
+      FROM users
+    `);
+    db.exec('DROP TABLE users');
+    db.exec('ALTER TABLE users_new RENAME TO users');
+    db.exec('PRAGMA foreign_keys = ON');
+  }
 }
 
 // Allow running directly: `node server/db/migrate.js`
