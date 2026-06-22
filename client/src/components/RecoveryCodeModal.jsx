@@ -1,16 +1,9 @@
-import { useState } from 'react';
 import { Modal, Stack, Text, Code, Button, Alert, Group, CopyButton, ActionIcon, Tooltip } from '@mantine/core';
 import { IconAlertTriangle, IconCopy, IconCheck } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
 export default function RecoveryCodeModal({ code, opened, onClose }) {
   const { t } = useTranslation();
-  const [confirmed, setConfirmed] = useState(false);
-
-  const handleClose = () => {
-    setConfirmed(false);
-    onClose();
-  };
 
   return (
     <Modal
@@ -33,7 +26,7 @@ export default function RecoveryCodeModal({ code, opened, onClose }) {
             </Code>
             <CopyButton value={code ?? ''} timeout={2000}>
               {({ copied, copy }) => (
-                <Tooltip label={copied ? t('auth.recoveryCodeCopied') : t('common.actions')} withArrow>
+                <Tooltip label={copied ? t('auth.recoveryCodeCopied') : t('common.copy', { defaultValue: 'Copy' })} withArrow>
                   <ActionIcon color={copied ? 'teal' : 'blue'} variant="light" size="lg" onClick={copy}>
                     {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
                   </ActionIcon>
@@ -43,7 +36,7 @@ export default function RecoveryCodeModal({ code, opened, onClose }) {
           </Group>
         </Stack>
         <Group justify="flex-end">
-          <Button onClick={handleClose}>
+          <Button onClick={onClose}>
             {t('common.close')}
           </Button>
         </Group>
