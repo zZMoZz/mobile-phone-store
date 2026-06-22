@@ -4,7 +4,7 @@ import { getDb } from '../db/connection.js';
 import { BACKUPS_DIR, ensureDataDirs } from '../db/paths.js';
 
 const PREFIX = 'store-backup-';
-const KEEP = 30; // retention: most recent N backups per folder
+const KEEP = 50; // retention: most recent N backups per folder
 
 function isBackupFile(name) {
   return name.startsWith(PREFIX) && name.endsWith('.db');
@@ -75,10 +75,19 @@ export async function createBackup(extraDir) {
   return { fileName, path: localPath };
 }
 
-/** Runs a backup for the scheduler/startup hook; logs but never throws. */
+// Shared clock so both auth routes and the interval stay in sync.
+let _lastBackupAt = 0;
+export const getLastBackupAt = () => _lastBackupAt;
+export const resetBackupClock = () => { _lastBackupAt = Date.now(); };
+
+const MIN_MS = 5 * 60 * 1000; // minimum gap between automatic backups
+
+/** Runs a backup for the scheduler/auth hook; logs but never throws. */
 export async function runScheduledBackup() {
+  if (Date.now() - _lastBackupAt < MIN_MS) return;
   try {
     const { fileName } = await createBackup();
+    resetBackupClock();
     console.log(`Automatic backup created: ${fileName}`);
   } catch (err) {
     console.error('Automatic backup failed:', err.message);

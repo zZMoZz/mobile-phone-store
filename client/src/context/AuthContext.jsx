@@ -53,6 +53,20 @@ export function AuthProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Fire a logout backup if the user closes the tab or browser without clicking logout.
+  useEffect(() => {
+    if (!token) return;
+    const handleUnload = () => {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+      });
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [token]);
+
   const handleLogout = useCallback(async () => {
     await logoutApi();
     sessionStorage.removeItem(TOKEN_KEY);

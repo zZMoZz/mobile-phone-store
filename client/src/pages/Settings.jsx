@@ -19,6 +19,7 @@ import {
   PasswordInput,
   SimpleGrid,
   Alert,
+  List,
 } from '@mantine/core';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -289,7 +290,11 @@ export default function Settings() {
             mb="xs"
           />
           <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" mb="md">
-            {t('settings.backupInfo', { hours: values.backup_interval_hours ?? 12 })}
+            <List size="sm" spacing={4}>
+              <List.Item>{t('settings.backupInfo1', { hours: values.backup_interval_hours ?? 12 })}</List.Item>
+              <List.Item>{t('settings.backupInfo2')}</List.Item>
+              <List.Item>{t('settings.backupInfo3')}</List.Item>
+            </List>
           </Alert>
           <SimpleGrid cols={{ base: 1, xs: 3 }}>
             <Button

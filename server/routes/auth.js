@@ -4,6 +4,7 @@ import { signToken } from '../lib/auth.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { findByUsername } from '../repositories/users.js';
 import { logActivity } from '../repositories/activityLogs.js';
+import { runScheduledBackup } from '../lib/backup.js';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.post('/login', (req, res, next) => {
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid credentials', code: 'auth_invalid_credentials' });
     }
+    runScheduledBackup(); // fire-and-forget: backup before issuing the session
     const token = signToken({ sub: user.id, username: user.username, role: user.role });
     logActivity({ userId: user.id, username: user.username, action: 'login' });
     res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
@@ -27,6 +29,7 @@ router.post('/login', (req, res, next) => {
 // POST /api/auth/logout — authenticated
 router.post('/logout', authenticate, (req, res, next) => {
   try {
+    runScheduledBackup(); // fire-and-forget: capture end-of-session state
     logActivity({ userId: req.user.id, username: req.user.username, action: 'logout' });
     res.json({ ok: true });
   } catch (err) { next(err); }
