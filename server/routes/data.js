@@ -25,29 +25,46 @@ function sendCsv(res, name, csv) {
 }
 
 router.get('/export/products.csv', requireAdmin, (req, res) => {
+  const ar = req.query.lang === 'ar';
+  const nameCol = ar ? 'name_ar' : 'name_en';
   const rows = getDb()
     .prepare(
       `SELECT p.id, p.name, p.barcode, p.quantity, p.buying_price, p.selling_price,
-              c.name_en AS category, b.name_en AS brand, p.is_temporary, p.created_at, p.updated_at
+              c.${nameCol} AS category, b.${nameCol} AS brand, p.is_temporary, p.created_at, p.updated_at
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        LEFT JOIN brands b ON b.id = p.brand_id
        ORDER BY p.id`,
     )
     .all();
-  const csv = toCsv(rows, [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Name' },
-    { key: 'barcode', label: 'Barcode' },
-    { key: 'quantity', label: 'Quantity' },
-    { key: 'buying_price', label: 'Buying Price' },
-    { key: 'selling_price', label: 'Selling Price' },
-    { key: 'category', label: 'Category' },
-    { key: 'brand', label: 'Brand' },
-    { key: 'is_temporary', label: 'Temporary' },
-    { key: 'created_at', label: 'Created' },
-    { key: 'updated_at', label: 'Updated' },
-  ]);
+  const columns = ar
+    ? [
+        { key: 'id', label: 'المعرف' },
+        { key: 'name', label: 'الاسم' },
+        { key: 'barcode', label: 'الباركود' },
+        { key: 'quantity', label: 'الكمية' },
+        { key: 'buying_price', label: 'سعر الشراء' },
+        { key: 'selling_price', label: 'سعر البيع' },
+        { key: 'category', label: 'الفئة' },
+        { key: 'brand', label: 'الماركة' },
+        { key: 'is_temporary', label: 'مؤقت' },
+        { key: 'created_at', label: 'تاريخ الإضافة' },
+        { key: 'updated_at', label: 'تاريخ التعديل' },
+      ]
+    : [
+        { key: 'id', label: 'ID' },
+        { key: 'name', label: 'Name' },
+        { key: 'barcode', label: 'Barcode' },
+        { key: 'quantity', label: 'Quantity' },
+        { key: 'buying_price', label: 'Buying Price' },
+        { key: 'selling_price', label: 'Selling Price' },
+        { key: 'category', label: 'Category' },
+        { key: 'brand', label: 'Brand' },
+        { key: 'is_temporary', label: 'Temporary' },
+        { key: 'created_at', label: 'Created' },
+        { key: 'updated_at', label: 'Updated' },
+      ];
+  const csv = toCsv(rows, columns);
   logActivity({ userId: req.user.id, username: req.user.username, action: 'export_products' });
   sendCsv(res, 'products.csv', csv);
 });

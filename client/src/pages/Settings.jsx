@@ -311,7 +311,7 @@ export default function Settings() {
               size="md"
               leftSection={<IconFileExport size={18} />}
               loading={exportingProducts}
-              onClick={() => downloadCsv('/export/products.csv', 'products.csv', setExportingProducts)}
+              onClick={() => downloadCsv(`/export/products.csv?lang=${lang}`, 'products.csv', setExportingProducts)}
             >
               {t('settings.exportProducts')}
             </Button>
