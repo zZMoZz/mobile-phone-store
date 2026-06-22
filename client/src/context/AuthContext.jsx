@@ -26,12 +26,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!token) { setLoading(false); return; }
     getMeApi()
-      .then((u) => {
-        setUser(u);
-        if (u.force_password_change) {
-          navigate('/force-change-password', { replace: true });
-        }
-      })
+      .then((u) => setUser(u))
       .catch(() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); })
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,10 +77,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (username, password) => {
     const { token: t, user: u } = await loginApi(username, password);
     applySession(t, u);
-    if (u.force_password_change) {
-      navigate('/force-change-password', { replace: true });
-    }
-  }, [applySession, navigate]);
+  }, [applySession]);
 
   const forceChangePassword = useCallback(async (new_password) => {
     const { token: t, user: u, recovery_code } = await forceChangePasswordApi(new_password);
