@@ -107,7 +107,7 @@ export default function ActivityLog() {
             placeholder={t('activityLog.allActions')}
             value={action}
             onChange={(v) => { setAction(v); setPage(1); }}
-            data={ALL_ACTIONS.map((a) => ({ value: a, label: a }))}
+            data={ALL_ACTIONS.map((a) => ({ value: a, label: t(`activityLog.actions.${a}`, { defaultValue: a }) }))}
             clearable
             searchable
             size="sm"
@@ -151,7 +151,7 @@ export default function ActivityLog() {
                   </Table.Td>
                   <Table.Td>
                     <Badge color={actionColor(log.action)} variant="light" size="sm">
-                      {log.action}
+                      {t(`activityLog.actions.${log.action}`, { defaultValue: log.action })}
                     </Badge>
                   </Table.Td>
                   <Table.Td>
