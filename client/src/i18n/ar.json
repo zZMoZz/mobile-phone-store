@@ -340,10 +340,11 @@
     "data": "البيانات",
     "backup": "إنشاء نسخة احتياطية",
     "backupDone": "تم إنشاء النسخة الاحتياطية",
-    "exportProducts": "تصدير المنتجات",
+    "exportProductsEn": "تصدير المنتجات (EN)",
+    "exportProductsAr": "تصدير المنتجات (AR)",
     "exportTransactions": "تصدير المعاملات",
-    "exportInfo1": "يُصدَّر ملفان: إنجليزي (products.csv) وعربي (products-ar.csv).",
+    "exportInfo1": "زرّان للتصدير: إنجليزي (products.csv) وعربي (products-ar.csv).",
     "exportInfo2": "تظهر أسماء الفئات والماركات باللغة المناسبة في كل ملف.",
-    "exportInfo3": "يُنزَّل كلا الملفين تلقائياً إلى مجلد التنزيلات."
+    "exportInfo3": "كل زر يُنزِّل ملفاً واحداً مباشرةً إلى مجلد التنزيلات."
   }
 }

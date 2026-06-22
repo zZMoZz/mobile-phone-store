@@ -340,10 +340,11 @@
     "data": "Data",
     "backup": "Create Backup",
     "backupDone": "Backup created",
-    "exportProducts": "Export Products",
+    "exportProductsEn": "Export Products (EN)",
+    "exportProductsAr": "Export Products (AR)",
     "exportTransactions": "Export Transactions",
-    "exportInfo1": "Exports two files: English (products.csv) and Arabic (products-ar.csv).",
+    "exportInfo1": "Two export buttons: English (products.csv) and Arabic (products-ar.csv).",
     "exportInfo2": "Category and brand names appear in the matching language in each file.",
-    "exportInfo3": "Both files download automatically to your Downloads folder."
+    "exportInfo3": "Each button downloads one file directly to your Downloads folder."
   }
 }

@@ -139,15 +139,12 @@ export default function Settings() {
     URL.revokeObjectURL(url);
   };
 
-  const exportProducts = async () => {
+  const exportProductsCsv = async (lang) => {
     setExportingProducts(true);
     try {
-      const [enBlob, arBlob] = await Promise.all([
-        exportCsv('/export/products.csv'),
-        exportCsv('/export/products.csv?lang=ar'),
-      ]);
-      downloadCsvAuto(enBlob, 'products.csv');
-      downloadCsvAuto(arBlob, 'products-ar.csv');
+      const ar = lang === 'ar';
+      const blob = await exportCsv(ar ? '/export/products.csv?lang=ar' : '/export/products.csv');
+      downloadCsvAuto(blob, ar ? 'products-ar.csv' : 'products.csv');
     } catch {
       notifications.show({ message: t('common.error'), color: 'red' });
     } finally {
@@ -328,7 +325,7 @@ export default function Settings() {
               <List.Item>{t('settings.exportInfo3')}</List.Item>
             </List>
           </Alert>
-          <SimpleGrid cols={{ base: 1, xs: 3 }}>
+          <SimpleGrid cols={{ base: 1, xs: 2 }}>
             <Button
               variant="default"
               size="md"
@@ -343,9 +340,18 @@ export default function Settings() {
               size="md"
               leftSection={<IconFileExport size={18} />}
               loading={exportingProducts}
-              onClick={exportProducts}
+              onClick={() => exportProductsCsv('en')}
             >
-              {t('settings.exportProducts')}
+              {t('settings.exportProductsEn')}
+            </Button>
+            <Button
+              variant="default"
+              size="md"
+              leftSection={<IconFileExport size={18} />}
+              loading={exportingProducts}
+              onClick={() => exportProductsCsv('ar')}
+            >
+              {t('settings.exportProductsAr')}
             </Button>
             <Button
               variant="default"
