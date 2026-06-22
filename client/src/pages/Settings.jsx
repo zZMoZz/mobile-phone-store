@@ -31,7 +31,9 @@ import {
   IconInfoCircle,
   IconPlus,
   IconPencil,
-  IconTrash,
+  IconKey,
+  IconUserOff,
+  IconUserCheck,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -41,7 +43,7 @@ import {
   exportCsv,
   pickFolder,
 } from '../api/settings.js';
-import { listUsers, createUser, updateUser, deleteUser } from '../api/users.js';
+import { listUsers, createUser, updateUser } from '../api/users.js';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { setLanguage } from '../i18n/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -55,8 +57,8 @@ export default function Settings() {
   const defaultNameEn = i18n.getFixedT('en')('app.title');
   const defaultNameAr = i18n.getFixedT('ar')('app.title');
   const { setSettings } = useSettings();
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
-  const { isAdmin, user: currentUser } = useAuth();
+  const { setColorScheme } = useMantineColorScheme();
+  const { isAdmin, isOwner, user: currentUser } = useAuth();
 
   // Settings state
   const [values, setValues] = useState(null);
@@ -69,10 +71,17 @@ export default function Settings() {
   const [users, setUsers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [userOpened, { open: openUserModal, close: closeUserModal }] = useDisclosure(false);
+  const [resetPwOpened, { open: openResetPw, close: closeResetPw }] = useDisclosure(false);
+  const [resetTarget, setResetTarget] = useState(null);
+
+  // Form fields
   const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('staff');
+  const [tempPassword, setTempPassword] = useState('');
   const [userSaving, setUserSaving] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
 
   useEffect(() => {
     getSettings().then(setValues);
@@ -148,6 +157,7 @@ export default function Settings() {
   const openNew = () => {
     setEditing(null);
     setUsername('');
+    setDisplayName('');
     setPassword('');
     setRole('staff');
     openUserModal();
@@ -156,20 +166,28 @@ export default function Settings() {
   const openEdit = (u) => {
     setEditing(u);
     setUsername(u.username);
+    setDisplayName(u.display_name || '');
     setPassword('');
     setRole(u.role);
     openUserModal();
+  };
+
+  const openResetPassword = (u) => {
+    setResetTarget(u);
+    setTempPassword('');
+    openResetPw();
   };
 
   const saveUser = async () => {
     setUserSaving(true);
     try {
       if (editing) {
-        const patch = { username, role };
-        if (password) patch.password = password;
-        await updateUser(editing.id, patch);
+        const patch = {};
+        if (displayName !== (editing.display_name || '')) patch.display_name = displayName.trim() || null;
+        if (role !== editing.role) patch.role = role;
+        if (Object.keys(patch).length > 0) await updateUser(editing.id, patch);
       } else {
-        await createUser({ username, password, role });
+        await createUser({ username, display_name: displayName.trim() || null, password, role });
       }
       notifications.show({ message: t('common.saved'), color: 'green' });
       closeUserModal();
@@ -178,7 +196,7 @@ export default function Settings() {
       notifications.show({
         message: err.response?.data?.code
           ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') })
-          : (err.response?.data?.error || t('common.error')),
+          : t('common.error'),
         color: 'red',
       });
     } finally {
@@ -186,27 +204,82 @@ export default function Settings() {
     }
   };
 
-  const removeUser = async (u) => {
-    if (u.id === currentUser?.id) {
-      notifications.show({ message: t('users.cannotDeleteSelf'), color: 'orange' });
-      return;
-    }
-    if (!window.confirm(t('users.deleteConfirm'))) return;
+  const saveResetPassword = async () => {
+    if (!tempPassword || !resetTarget) return;
+    setResetSaving(true);
     try {
-      await deleteUser(u.id);
-      notifications.show({ message: t('common.deleted'), color: 'green' });
+      await updateUser(resetTarget.id, { password: tempPassword });
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      closeResetPw();
       loadUsers();
     } catch (err) {
       notifications.show({
         message: err.response?.data?.code
           ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') })
-          : (err.response?.data?.error || t('common.error')),
+          : t('common.error'),
+        color: 'red',
+      });
+    } finally {
+      setResetSaving(false);
+    }
+  };
+
+  const toggleStatus = async (u) => {
+    if (u.id === currentUser?.id) {
+      notifications.show({ message: t('users.cannotDisableSelf'), color: 'orange' });
+      return;
+    }
+    const newStatus = u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    const msg = newStatus === 'DISABLED' ? t('users.disableConfirm') : t('users.enableConfirm');
+    if (!window.confirm(msg)) return;
+    try {
+      await updateUser(u.id, { status: newStatus });
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      loadUsers();
+    } catch (err) {
+      notifications.show({
+        message: err.response?.data?.code
+          ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') })
+          : t('common.error'),
         color: 'red',
       });
     }
   };
 
-  const roleColor = (r) => (r === 'admin' ? 'violet' : 'blue');
+  // What the current viewer can do to a given target user
+  const canEdit = (u) => {
+    if (u.role === 'owner') return false;
+    if (isOwner) return true;
+    if (isAdmin && u.role === 'staff') return true;
+    return false;
+  };
+
+  const canResetPassword = (u) => {
+    if (u.role === 'owner') return false;
+    if (isOwner) return true;
+    if (isAdmin && u.role === 'staff') return true;
+    return false;
+  };
+
+  const canToggleStatus = (u) => {
+    if (u.id === currentUser?.id) return false;
+    if (u.role === 'owner') return false;
+    if (isOwner) return true;
+    if (isAdmin && u.role === 'staff') return true;
+    return false;
+  };
+
+  const roleColor = (r) => ({ owner: 'grape', admin: 'violet', staff: 'blue' })[r] ?? 'gray';
+  const statusColor = (s) => (s === 'ACTIVE' ? 'green' : 'red');
+
+  // Role options available when creating/editing
+  const roleOptions = () => {
+    if (isOwner) return [
+      { value: 'admin', label: t('users.roleAdmin') },
+      { value: 'staff', label: t('users.roleStaff') },
+    ];
+    return [{ value: 'staff', label: t('users.roleStaff') }];
+  };
 
   if (!values) return null;
 
@@ -339,48 +412,66 @@ export default function Settings() {
           <Divider />
           <Table highlightOnHover verticalSpacing="md" fz="md">
             <Table.Thead>
-              <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
+              <Table.Tr>
                 <Table.Th>{t('users.username')}</Table.Th>
+                <Table.Th>{t('users.displayName')}</Table.Th>
                 <Table.Th>{t('users.role')}</Table.Th>
+                <Table.Th>{t('common.actions')}</Table.Th>
                 <Table.Th>{t('users.createdAt')}</Table.Th>
-                <Table.Th w={80} />
+                <Table.Th w={120} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {users.map((u) => (
                 <Table.Tr key={u.id}>
-                  <Table.Td>
-                    <Text fw={500}>{u.username}</Text>
-                  </Table.Td>
+                  <Table.Td><Text fw={500}>{u.username}</Text></Table.Td>
+                  <Table.Td><Text c="dimmed">{u.display_name || '—'}</Text></Table.Td>
                   <Table.Td>
                     <Badge color={roleColor(u.role)} variant="light">
-                      {t(`users.role${u.role === 'admin' ? 'Admin' : 'Staff'}`)}
+                      {t(`users.role${u.role === 'owner' ? 'Owner' : u.role === 'admin' ? 'Admin' : 'Staff'}`)}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge color={statusColor(u.status)} variant="dot">
+                      {t(`users.status${u.status === 'ACTIVE' ? 'Active' : 'Disabled'}`)}
                     </Badge>
                   </Table.Td>
                   <Table.Td>{formatDate(u.created_at, lang)}</Table.Td>
                   <Table.Td>
                     <Group gap={4} justify="flex-end">
-                      <ActionIcon variant="subtle" onClick={() => openEdit(u)}>
-                        <IconPencil size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        disabled={u.id === currentUser?.id}
-                        onClick={() => removeUser(u)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
+                      {canEdit(u) && (
+                        <Tooltip label={t('common.edit')}>
+                          <ActionIcon variant="subtle" onClick={() => openEdit(u)}>
+                            <IconPencil size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      {canResetPassword(u) && (
+                        <Tooltip label={t('users.resetPassword')}>
+                          <ActionIcon variant="subtle" color="orange" onClick={() => openResetPassword(u)}>
+                            <IconKey size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      {canToggleStatus(u) && (
+                        <Tooltip label={u.status === 'ACTIVE' ? t('users.disable') : t('users.enable')}>
+                          <ActionIcon
+                            variant="subtle"
+                            color={u.status === 'ACTIVE' ? 'red' : 'green'}
+                            onClick={() => toggleStatus(u)}
+                          >
+                            {u.status === 'ACTIVE' ? <IconUserOff size={16} /> : <IconUserCheck size={16} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
                     </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
               {users.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={4}>
-                    <Center p="lg">
-                      <Text c="dimmed">{t('common.noResults')}</Text>
-                    </Center>
+                  <Table.Td colSpan={6}>
+                    <Center p="lg"><Text c="dimmed">{t('common.noResults')}</Text></Center>
                   </Table.Td>
                 </Table.Tr>
               )}
@@ -389,41 +480,78 @@ export default function Settings() {
         </Paper>
       )}
 
+      {/* Create / Edit User Modal */}
       <Modal
         opened={userOpened}
         onClose={closeUserModal}
         title={editing ? t('users.editUser') : t('users.newUser')}
       >
         <Stack gap="sm">
+          {!editing && (
+            <TextInput
+              size="md"
+              label={t('users.username')}
+              value={username}
+              onChange={(e) => setUsername(e.currentTarget.value)}
+              required
+            />
+          )}
+          {editing && (
+            <Text size="sm" c="dimmed">{t('auth.username')}: <strong>{editing.username}</strong></Text>
+          )}
           <TextInput
             size="md"
-            label={t('users.username')}
-            value={username}
-            onChange={(e) => setUsername(e.currentTarget.value)}
-            required
+            label={t('users.displayName')}
+            description={t('users.displayNameHint')}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.currentTarget.value)}
           />
-          <PasswordInput
-            size="md"
-            label={t('users.password')}
-            description={editing ? t('users.passwordHint') : undefined}
-            value={password}
-            onChange={(e) => setPassword(e.currentTarget.value)}
-            required={!editing}
-          />
+          {!editing && (
+            <PasswordInput
+              size="md"
+              label={t('users.password')}
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              required
+            />
+          )}
           <Select
             size="md"
             label={t('users.role')}
             value={role}
             onChange={(v) => v && setRole(v)}
-            data={[
-              { value: 'admin', label: t('users.roleAdmin') },
-              { value: 'staff', label: t('users.roleStaff') },
-            ]}
+            data={roleOptions()}
             allowDeselect={false}
+            disabled={editing && !isOwner && editing.role === 'admin'}
           />
           <Group justify="flex-end" mt="sm">
             <Button variant="default" onClick={closeUserModal}>{t('common.cancel')}</Button>
             <Button loading={userSaving} onClick={saveUser}>{t('common.save')}</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        opened={resetPwOpened}
+        onClose={closeResetPw}
+        title={t('users.resetPassword')}
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">{resetTarget?.username}</Text>
+          <PasswordInput
+            size="md"
+            label={t('users.tempPassword')}
+            description={t('users.tempPasswordHint')}
+            value={tempPassword}
+            onChange={(e) => setTempPassword(e.currentTarget.value)}
+            required
+          />
+          <Group justify="flex-end" mt="sm">
+            <Button variant="default" onClick={closeResetPw}>{t('common.cancel')}</Button>
+            <Button loading={resetSaving} onClick={saveResetPassword} disabled={!tempPassword}>
+              {t('users.resetPassword')}
+            </Button>
           </Group>
         </Stack>
       </Modal>
