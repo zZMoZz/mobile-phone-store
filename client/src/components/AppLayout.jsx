@@ -13,6 +13,9 @@ import {
   Burger,
   useMantineColorScheme,
   useDirection,
+  Menu,
+  Avatar,
+  UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
@@ -27,11 +30,13 @@ import {
   IconLayoutSidebarLeftExpand,
   IconHistory,
   IconLogout,
+  IconUser,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from '../i18n/index.js';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import AccountModal from './AccountModal.jsx';
 
 const COLLAPSE_KEY = 'store.sidebar-collapsed';
 
@@ -44,42 +49,60 @@ function HeaderControls() {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const { setDirection } = useDirection();
   const { user, logout } = useAuth();
+  const [accountOpened, { open: openAccount, close: closeAccount }] = useDisclosure(false);
 
   // Keep Mantine layout direction in sync with the active language.
   useEffect(() => {
     setDirection(i18n.language === 'ar' ? 'rtl' : 'ltr');
   }, [i18n.language, setDirection]);
 
+  const displayLabel = user?.display_name || user?.username || '';
+  const initial = displayLabel[0]?.toUpperCase() ?? '?';
+
   return (
-    <Group gap="sm">
-      <Select
-        aria-label={t('common.language')}
-        size="xs"
-        w={120}
-        value={i18n.language}
-        onChange={(val) => val && setLanguage(val)}
-        data={[
-          { value: 'ar', label: 'العربية' },
-          { value: 'en', label: 'English' },
-        ]}
-        allowDeselect={false}
-      />
-      <Tooltip label={t('common.theme')}>
-        <ActionIcon variant="default" size="lg" onClick={toggleColorScheme}>
-          {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-        </ActionIcon>
-      </Tooltip>
-      {user && (
-        <>
-          <Text size="sm" c="dimmed">{user.username}</Text>
-          <Tooltip label={t('auth.logout')}>
-            <ActionIcon variant="default" size="lg" onClick={logout}>
-              <IconLogout size={18} />
-            </ActionIcon>
-          </Tooltip>
-        </>
-      )}
-    </Group>
+    <>
+      <Group gap="sm">
+        <Select
+          aria-label={t('common.language')}
+          size="xs"
+          w={120}
+          value={i18n.language}
+          onChange={(val) => val && setLanguage(val)}
+          data={[
+            { value: 'ar', label: 'العربية' },
+            { value: 'en', label: 'English' },
+          ]}
+          allowDeselect={false}
+        />
+        <Tooltip label={t('common.theme')}>
+          <ActionIcon variant="default" size="lg" onClick={toggleColorScheme}>
+            {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+          </ActionIcon>
+        </Tooltip>
+        {user && (
+          <Menu shadow="md" width={180} position="bottom-end">
+            <Menu.Target>
+              <UnstyledButton>
+                <Group gap="xs">
+                  <Avatar size="sm" radius="xl" color="blue">{initial}</Avatar>
+                  <Text size="sm" visibleFrom="sm">{displayLabel}</Text>
+                </Group>
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconUser size={14} />} onClick={openAccount}>
+                {t('auth.myAccount')}
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Item leftSection={<IconLogout size={14} />} onClick={logout} color="red">
+                {t('auth.logout')}
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
+      </Group>
+      <AccountModal opened={accountOpened} onClose={closeAccount} />
+    </>
   );
 }
 
@@ -152,7 +175,7 @@ export default function AppLayout({ children }) {
                 styles={
                   collapsed
                     ? { section: { marginInlineEnd: 0 }, body: { display: 'none' } }
-                    : undefined
+                    : { label: { fontWeight: 700 } }
                 }
               />
             );
@@ -183,7 +206,7 @@ export default function AppLayout({ children }) {
                 styles={
                   collapsed
                     ? { section: { marginInlineEnd: 0 }, body: { display: 'none' } }
-                    : undefined
+                    : { label: { fontWeight: 700 } }
                 }
               />
             );
