@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client.js';
-import { loginApi, logoutApi, getMeApi } from '../api/auth.js';
+import { loginApi, logoutApi, getMeApi, forceChangePasswordApi, changePasswordApi } from '../api/auth.js';
+import { updateUser } from '../api/users.js';
 
 const TOKEN_KEY = 'store.auth-token';
-
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -22,18 +22,17 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  // Validate token on mount
+  // Validate token on mount; redirect if force_password_change is set
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) { setLoading(false); return; }
     getMeApi()
-      .then((u) => setUser(u))
-      .catch(() => {
-        sessionStorage.removeItem(TOKEN_KEY);
-        setToken(null);
+      .then((u) => {
+        setUser(u);
+        if (u.force_password_change) {
+          navigate('/force-change-password', { replace: true });
+        }
       })
+      .catch(() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); })
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -43,9 +42,7 @@ export function AuthProvider({ children }) {
     const id = api.interceptors.response.use(
       (res) => res,
       (err) => {
-        if (err.response?.status === 401 && user) {
-          handleLogout();
-        }
+        if (err.response?.status === 401 && user) handleLogout();
         return Promise.reject(err);
       },
     );
@@ -53,7 +50,7 @@ export function AuthProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Fire a logout backup if the user closes the tab or browser without clicking logout.
+  // Fire a logout beacon if the user closes the tab or browser without clicking logout
   useEffect(() => {
     if (!token) return;
     const handleUnload = () => {
@@ -67,6 +64,13 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [token]);
 
+  const applySession = useCallback((newToken, newUser) => {
+    sessionStorage.setItem(TOKEN_KEY, newToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    setToken(newToken);
+    setUser(newUser);
+  }, []);
+
   const handleLogout = useCallback(async () => {
     await logoutApi();
     sessionStorage.removeItem(TOKEN_KEY);
@@ -77,16 +81,37 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     const { token: t, user: u } = await loginApi(username, password);
-    sessionStorage.setItem(TOKEN_KEY, t);
-    setToken(t);
-    setUser(u);
-  }, []);
+    applySession(t, u);
+    if (u.force_password_change) {
+      navigate('/force-change-password', { replace: true });
+    }
+  }, [applySession, navigate]);
 
-  const isAdmin = useMemo(() => user?.role === 'admin', [user]);
+  const forceChangePassword = useCallback(async (new_password) => {
+    const { token: t, user: u, recovery_code } = await forceChangePasswordApi(new_password);
+    applySession(t, u);
+    return recovery_code; // may be null for staff
+  }, [applySession]);
+
+  const changePassword = useCallback(async (current_password, new_password) => {
+    const { token: t, user: u } = await changePasswordApi(current_password, new_password);
+    applySession(t, u);
+  }, [applySession]);
+
+  const updateUserInContext = useCallback(async (id, patch) => {
+    const updated = await updateUser(id, patch);
+    if (user && updated.id === user.id) {
+      setUser((prev) => ({ ...prev, ...updated }));
+    }
+    return updated;
+  }, [user]);
+
+  const isAdmin = useMemo(() => user?.role === 'admin' || user?.role === 'owner', [user]);
+  const isOwner = useMemo(() => user?.role === 'owner', [user]);
 
   const value = useMemo(
-    () => ({ user, loading, isAdmin, login, logout: handleLogout }),
-    [user, loading, isAdmin, login, handleLogout],
+    () => ({ user, loading, isAdmin, isOwner, login, logout: handleLogout, forceChangePassword, changePassword, updateUserInContext }),
+    [user, loading, isAdmin, isOwner, login, handleLogout, forceChangePassword, changePassword, updateUserInContext],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

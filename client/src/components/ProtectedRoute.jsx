@@ -6,6 +6,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading, isAdmin } = useAuth();
   if (loading) return <Center h="100vh"><Loader /></Center>;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.force_password_change) return <Navigate to="/force-change-password" replace />;
   if (adminOnly && !isAdmin) return <Navigate to="/" replace />;
   return children;
 }
