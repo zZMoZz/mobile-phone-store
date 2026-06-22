@@ -9,7 +9,7 @@ import request from 'supertest';
  * then dynamically imports the app + db so they bind to the temp database.
  * Returns { app, db, token, api, cleanup }.
  *
- * `token`  — a signed admin JWT for making authenticated requests manually.
+ * `token`  — a signed owner JWT for making authenticated requests manually.
  * `api`    — a supertest wrapper pre-configured with the Bearer token.
  *            Use `api.get('/api/...')` instead of `request(app).get('/api/...')`.
  *
@@ -35,8 +35,15 @@ export async function setupTestApp() {
   const db = getDb();
   const app = createApp();
 
-  // Sign a long-lived admin token for test requests.
-  const token = signToken({ sub: 1, username: 'test-admin', role: 'admin' });
+  // Use the seeded owner so token_version and role match the DB.
+  const owner = db.prepare("SELECT * FROM users WHERE role = 'owner'").get();
+  const token = signToken({
+    sub: owner.id,
+    username: owner.username,
+    display_name: owner.display_name,
+    role: owner.role,
+    tv: owner.token_version,
+  });
 
   // Thin wrapper: mirrors the request(app) interface but injects the Bearer header
   // on every method call so individual tests don't need to set it manually.
