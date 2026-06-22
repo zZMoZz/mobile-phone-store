@@ -11,7 +11,6 @@ import NewTransaction from './pages/NewTransaction.jsx';
 import ManageLists from './pages/ManageLists.jsx';
 import ManageServices from './pages/ManageServices.jsx';
 import Settings from './pages/Settings.jsx';
-import Users from './pages/Users.jsx';
 import ActivityLog from './pages/ActivityLog.jsx';
 
 export default function App() {
@@ -33,14 +32,6 @@ export default function App() {
                     <Route path="/services/manage" element={<ManageServices />} />
                     <Route path="/lists" element={<ManageLists />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route
-                      path="/users"
-                      element={
-                        <ProtectedRoute adminOnly>
-                          <Users />
-                        </ProtectedRoute>
-                      }
-                    />
                     <Route path="/activity-log" element={<ActivityLog />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>

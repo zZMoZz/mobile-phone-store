@@ -26,7 +26,6 @@ import {
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconHistory,
-  IconUsers,
   IconLogout,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -114,7 +113,6 @@ export default function AppLayout({ children }) {
     { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus },
     { to: '/lists', key: 'lists', icon: IconTags },
     { to: '/activity-log', key: 'activityLog', icon: IconHistory },
-    ...(isAdmin ? [{ to: '/users', key: 'users', icon: IconUsers }] : []),
     { to: '/settings', key: 'settings', icon: IconSettings },
   ];
 
