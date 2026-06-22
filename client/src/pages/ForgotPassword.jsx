@@ -24,6 +24,7 @@ export default function ForgotPassword() {
   const [username, setUsername] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [newCode, setNewCode] = useState(null);
@@ -34,6 +35,10 @@ export default function ForgotPassword() {
     setError('');
     if (newPassword.length < 6) {
       setError(t('errors.auth_password_too_short'));
+      return;
+    }
+    if (newPassword !== confirm) {
+      setError(t('auth.passwordMismatch'));
       return;
     }
     setLoading(true);
@@ -87,6 +92,12 @@ export default function ForgotPassword() {
                   label={t('auth.newPassword')}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.currentTarget.value)}
+                  required
+                />
+                <PasswordInput
+                  label={t('auth.confirmPassword')}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.currentTarget.value)}
                   required
                 />
                 <Button type="submit" fullWidth mt="xs" loading={loading}>
