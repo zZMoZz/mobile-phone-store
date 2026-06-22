@@ -37,7 +37,10 @@
     "recoverSuccess": "Password reset. Please save your new recovery code.",
     "accountDisabled": "Your account has been disabled. Contact your administrator.",
     "passwordTooShort": "Password must be at least 6 characters",
-    "wrongPassword": "Current password is incorrect"
+    "wrongPassword": "Current password is incorrect",
+    "confirmPassword": "Confirm Password",
+    "passwordMismatch": "Passwords do not match",
+    "forceChangeHint": "You must set a new password before continuing."
   },
   "common": {
     "search": "Search",
