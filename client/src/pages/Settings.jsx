@@ -416,7 +416,7 @@ export default function Settings() {
                 <Table.Th>{t('users.username')}</Table.Th>
                 <Table.Th>{t('users.displayName')}</Table.Th>
                 <Table.Th>{t('users.role')}</Table.Th>
-                <Table.Th>{t('common.actions')}</Table.Th>
+                <Table.Th>{t('users.status')}</Table.Th>
                 <Table.Th>{t('users.createdAt')}</Table.Th>
                 <Table.Th w={120} />
               </Table.Tr>
@@ -524,6 +524,9 @@ export default function Settings() {
             allowDeselect={false}
             disabled={editing && !isOwner && editing.role === 'admin'}
           />
+          {!editing && (
+            <Text size="sm" c="dimmed">{t('users.newUserHint')}</Text>
+          )}
           <Group justify="flex-end" mt="sm">
             <Button variant="default" onClick={closeUserModal}>{t('common.cancel')}</Button>
             <Button loading={userSaving} onClick={saveUser}>{t('common.save')}</Button>

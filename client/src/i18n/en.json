@@ -354,7 +354,9 @@
     "cannotDisableSelf": "You cannot disable your own account",
     "resetPassword": "Reset Password",
     "tempPassword": "Temporary Password",
-    "tempPasswordHint": "The user will be required to change this on next login."
+    "tempPasswordHint": "The user will be required to change this on next login.",
+    "status": "Status",
+    "newUserHint": "The user will be asked to set their own password on first login."
   },
   "activityLog": {
     "title": "Activity Log",
