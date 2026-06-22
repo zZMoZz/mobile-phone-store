@@ -19,6 +19,7 @@ import {
   PasswordInput,
   SimpleGrid,
   Alert,
+  List,
 } from '@mantine/core';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -126,6 +127,31 @@ export default function Settings() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadCsvAuto = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportProducts = async () => {
+    setExportingProducts(true);
+    try {
+      const [enBlob, arBlob] = await Promise.all([
+        exportCsv('/export/products.csv'),
+        exportCsv('/export/products.csv?lang=ar'),
+      ]);
+      downloadCsvAuto(enBlob, 'products.csv');
+      downloadCsvAuto(arBlob, 'products-ar.csv');
+    } catch {
+      notifications.show({ message: t('common.error'), color: 'red' });
+    } finally {
+      setExportingProducts(false);
     }
   };
 
@@ -289,7 +315,18 @@ export default function Settings() {
             mb="xs"
           />
           <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" mb="md">
-            {t('settings.backupInfo', { hours: values.backup_interval_hours ?? 12 })}
+            <List size="sm" spacing={4}>
+              <List.Item>{t('settings.backupInfo1', { hours: values.backup_interval_hours ?? 12 })}</List.Item>
+              <List.Item>{t('settings.backupInfo2')}</List.Item>
+              <List.Item>{t('settings.backupInfo3')}</List.Item>
+            </List>
+          </Alert>
+          <Alert icon={<IconInfoCircle size={16} />} color="teal" variant="light" mb="md">
+            <List size="sm" spacing={4}>
+              <List.Item>{t('settings.exportInfo1')}</List.Item>
+              <List.Item>{t('settings.exportInfo2')}</List.Item>
+              <List.Item>{t('settings.exportInfo3')}</List.Item>
+            </List>
           </Alert>
           <SimpleGrid cols={{ base: 1, xs: 3 }}>
             <Button
@@ -306,7 +343,7 @@ export default function Settings() {
               size="md"
               leftSection={<IconFileExport size={18} />}
               loading={exportingProducts}
-              onClick={() => downloadCsv('/export/products.csv', 'products.csv', setExportingProducts)}
+              onClick={exportProducts}
             >
               {t('settings.exportProducts')}
             </Button>
