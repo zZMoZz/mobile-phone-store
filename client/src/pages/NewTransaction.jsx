@@ -24,7 +24,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconTrash, IconPlus, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import BarcodeInput from '../components/BarcodeInput.jsx';
+import ProductSearchInput from '../components/ProductSearchInput.jsx';
 import { lookupByBarcode, searchProducts } from '../api/products.js';
 import { listTransactions, getTransaction, createTransaction } from '../api/transactions.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
@@ -137,17 +137,31 @@ export default function NewTransaction() {
 
   const addLine = (line) => setLines((prev) => [...prev, { key: nextKey(), ...line }]);
 
-  const addProductLine = (product) =>
-    addLine({
-      product_id: product.id,
-      name: product.name,
-      barcode: product.barcode,
-      quantity: 1,
-      unit_price: priceFor(product),
-      unit_cost: product.buying_price,
-      stock: product.quantity,
-      locked: true,
+  const addProductLine = (product) => {
+    const unitPrice = priceFor(product);
+    setLines((prev) => {
+      const existing = prev.find((l) => l.product_id === product.id);
+      if (existing) {
+        return prev.map((l) =>
+          l.product_id === product.id ? { ...l, quantity: (Number(l.quantity) || 0) + 1 } : l
+        );
+      }
+      return [
+        ...prev,
+        {
+          key: nextKey(),
+          product_id: product.id,
+          name: product.name,
+          barcode: product.barcode,
+          quantity: 1,
+          unit_price: unitPrice,
+          unit_cost: product.buying_price,
+          stock: product.quantity,
+          locked: true,
+        },
+      ];
     });
+  };
 
   const handleScan = async (code) => {
     const byBarcode = await lookupByBarcode(code).catch(() => null);
@@ -236,11 +250,11 @@ export default function NewTransaction() {
 
       <Paper withBorder p="md" radius="md">
             <Group align="flex-end" mb="sm">
-              <BarcodeInput
+              <ProductSearchInput
                 ref={barcodeRef}
                 onScan={handleScan}
+                onProductSelect={addProductLine}
                 placeholder={t('newTxn.scanToAdd')}
-                autoFocus={false}
                 style={{ flex: 1 }}
               />
               <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>

@@ -226,14 +226,6 @@ export function create(payload) {
         if (type === 'purchase') {
           products.adjustQuantity(product.id, quantity);
         } else {
-          if (product.quantity < quantity) {
-            const err = new Error(
-              `Insufficient stock for "${product.name}": ${product.quantity} available, ${quantity} requested`,
-            );
-            err.status = 400;
-            err.code = 'insufficient_stock';
-            throw err;
-          }
           products.adjustQuantity(product.id, -quantity);
         }
       }
