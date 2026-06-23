@@ -84,6 +84,37 @@ function applyColumnMigrations(db) {
     db.exec('ALTER TABLE users_new RENAME TO users');
     db.exec('PRAGMA foreign_keys = ON');
   }
+
+  // Migrate option_lists.options from string[] to {name_en, name_ar}[].
+  db.prepare('SELECT id, options FROM option_lists').all().forEach(({ id, options }) => {
+    const parsed = JSON.parse(options || '[]');
+    if (parsed.length > 0 && typeof parsed[0] === 'string') {
+      const migrated = parsed.map((s) => ({ name_en: s, name_ar: s }));
+      db.prepare('UPDATE option_lists SET options = ? WHERE id = ?').run(JSON.stringify(migrated), id);
+    }
+  });
+
+  // Migrate services.fields inline options from string[] to {name_en, name_ar}[].
+  db.prepare('SELECT id, fields FROM services').all().forEach(({ id, fields }) => {
+    const parsed = JSON.parse(fields || '[]');
+    let changed = false;
+    const updated = parsed.map((f) => {
+      if (f.type !== 'select' || !Array.isArray(f.options) || f.options.length === 0) return f;
+      if (typeof f.options[0] !== 'string') return f;
+      changed = true;
+      return { ...f, options: f.options.map((s) => ({ name_en: s, name_ar: s })) };
+    });
+    if (changed) db.prepare('UPDATE services SET fields = ? WHERE id = ?').run(JSON.stringify(updated), id);
+  });
+
+  // Ensure at least one owner exists. Pre-auth-overhaul DBs had all users as
+  // 'admin'; the recreation above preserves that role, leaving no owner.
+  // Promote the oldest admin to owner so the permission matrix works correctly.
+  const ownerCount = db.prepare("SELECT COUNT(*) AS c FROM users WHERE role = 'owner'").get().c;
+  if (ownerCount === 0) {
+    const oldest = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1").get();
+    if (oldest) db.prepare("UPDATE users SET role = 'owner' WHERE id = ?").run(oldest.id);
+  }
 }
 
 // Allow running directly: `node server/db/migrate.js`

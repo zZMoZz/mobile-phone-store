@@ -1,15 +1,22 @@
 import { TextInput, NumberInput, Select } from '@mantine/core';
 
 /**
- * Resolve the choices for a select field (shared option list or inline options).
+ * Resolve the choices for a select field as Mantine Select data ({value, label}).
+ * value = name_en (stable canonical key); label = localized display name.
  */
-export function fieldOptions(field, optionLists) {
+export function fieldOptions(field, optionLists, lang = 'en') {
   if (field.type !== 'select') return [];
+  let opts;
   if (field.option_list_id != null) {
     const list = (optionLists || []).find((l) => l.id === field.option_list_id);
-    return list ? list.options : [];
+    opts = list ? list.options : [];
+  } else {
+    opts = field.options || [];
   }
-  return field.options || [];
+  return opts.map((o) => {
+    if (typeof o === 'string') return { value: o, label: o };
+    return { value: o.name_en, label: lang === 'ar' ? o.name_ar : o.name_en };
+  });
 }
 
 /**
@@ -31,7 +38,7 @@ export function ServiceFieldInput({ field, value, onChange, optionLists, lang })
   }
 
   if (field.type === 'select') {
-    const choices = fieldOptions(field, optionLists);
+    const choices = fieldOptions(field, optionLists, lang);
     return (
       <Select
         label={label}

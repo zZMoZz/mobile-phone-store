@@ -234,7 +234,7 @@ function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQue
         </Group>
       </Group>
 
-      <Table highlightOnHover verticalSpacing="sm">
+      <Table highlightOnHover verticalSpacing="sm" styles={{ td: { fontWeight: 500 } }}>
         <Table.Thead>
           <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
             <Table.Th w={40} />
@@ -265,15 +265,15 @@ function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQue
                   </Tooltip>
                 )}
               </Table.Td>
-              <Table.Td><Text fw={500}>{item.name_en}</Text></Table.Td>
-              <Table.Td><Text fw={500}>{item.name_ar}</Text></Table.Td>
+              <Table.Td>{item.name_en}</Table.Td>
+              <Table.Td>{item.name_ar}</Table.Td>
               <Table.Td>
-                <Text fw={600} c={(item.product_count ?? 0) === 0 ? 'red' : undefined}>
+                <Text fw={700} c={(item.product_count ?? 0) === 0 ? 'red' : 'dimmed'}>
                   {item.product_count ?? 0}
                 </Text>
               </Table.Td>
               <Table.Td>
-                <Text fw={600} c={(item.units_count ?? 0) === 0 ? 'red' : undefined}>
+                <Text fw={700} c={(item.units_count ?? 0) === 0 ? 'red' : 'dimmed'}>
                   {item.units_count ?? 0}
                 </Text>
               </Table.Td>

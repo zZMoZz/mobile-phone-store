@@ -31,6 +31,7 @@ import {
   IconHistory,
   IconLogout,
   IconUser,
+  IconTool,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from '../i18n/index.js';
@@ -134,6 +135,7 @@ export default function AppLayout({ children }) {
     { to: '/', key: 'dashboard', icon: IconLayoutDashboard, end: true },
     { to: '/inventory', key: 'inventory', icon: IconBox },
     { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus },
+    { to: '/services/manage', key: 'services', icon: IconTool },
     { to: '/lists', key: 'lists', icon: IconTags },
     { to: '/activity-log', key: 'activityLog', icon: IconHistory },
     { to: '/settings', key: 'settings', icon: IconSettings },
@@ -171,10 +173,10 @@ export default function AppLayout({ children }) {
                 label={collapsed ? undefined : t(`nav.${key}`)}
                 leftSection={<Icon size={20} />}
                 active={active}
-                mb={4}
+                variant={active ? 'filled' : 'subtle'}
                 styles={
                   collapsed
-                    ? { section: { marginInlineEnd: 0 }, body: { display: 'none' } }
+                    ? { section: { marginInlineEnd: 0 }, body: { display: 'none' }, root: { justifyContent: 'center' } }
                     : { label: { fontWeight: 700 } }
                 }
               />
@@ -205,7 +207,7 @@ export default function AppLayout({ children }) {
                 }
                 styles={
                   collapsed
-                    ? { section: { marginInlineEnd: 0 }, body: { display: 'none' } }
+                    ? { section: { marginInlineEnd: 0 }, body: { display: 'none' }, root: { justifyContent: 'center' } }
                     : { label: { fontWeight: 700 } }
                 }
               />

@@ -64,43 +64,6 @@ export function seed() {
   ensureProtected('categories', { name_en: 'Generic', name_ar: 'عام' });
   ensureProtected('brands', { name_en: 'Generic', name_ar: 'غير محدد' });
 
-  // Services module seed (new model). Idempotent: only when there are no services yet.
-  if (db.prepare('SELECT COUNT(*) AS c FROM services').get().c === 0) {
-    const providers = db
-      .prepare('INSERT INTO option_lists (name_en, name_ar, options) VALUES (?, ?, ?)')
-      .run('Providers', 'المزودون', JSON.stringify(['Vodafone', 'WE', 'Orange', 'E&']));
-    const providersId = providers.lastInsertRowid;
-
-    const insertService = db.prepare(
-      'INSERT INTO services (name_en, name_ar, fields, sort_order) VALUES (?, ?, ?, ?)',
-    );
-    const topupId = insertService.run(
-      'Top-up',
-      'شحن',
-      JSON.stringify([
-        { key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'select', required: true, option_list_id: providersId },
-        { key: 'type', label_en: 'Type', label_ar: 'النوع', type: 'select', required: true, options: ['شحن', 'كارت فكة', 'أخرى'] },
-      ]),
-      1,
-    ).lastInsertRowid;
-    insertService.run(
-      'Bill Payment',
-      'دفع فواتير',
-      JSON.stringify([
-        { key: 'provider', label_en: 'Provider', label_ar: 'المزود', type: 'select', required: false, option_list_id: providersId },
-      ]),
-      2,
-    );
-    insertService.run('Maintenance', 'صيانة', JSON.stringify([]), 3);
-
-    const insertShortcut = db.prepare(
-      'INSERT INTO service_shortcuts (service_id, label_en, label_ar, color, sort_order, preset_values) VALUES (?, ?, ?, ?, ?, ?)',
-    );
-    insertShortcut.run(topupId, 'Vodafone شحن', 'فودافون شحن', 'red', 1, JSON.stringify({ provider: 'Vodafone', type: 'شحن' }));
-    insertShortcut.run(topupId, 'Orange شحن', 'أورنج شحن', 'orange', 2, JSON.stringify({ provider: 'Orange', type: 'شحن' }));
-    insertShortcut.run(topupId, 'WE شحن', 'وي شحن', 'grape', 3, JSON.stringify({ provider: 'WE', type: 'شحن' }));
-  }
-
   // Ensure the single settings row exists.
   const hasSettings = db.prepare('SELECT COUNT(*) AS c FROM settings').get().c;
   if (!hasSettings) {

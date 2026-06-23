@@ -12,28 +12,28 @@ import {
   TextInput,
   Select,
   Switch,
-  TagsInput,
   SegmentedControl,
   Center,
   Divider,
   ColorInput,
   NumberInput,
-  Badge,
   ColorSwatch,
-  Box,
+  Checkbox,
+  useMantineColorScheme,
+  Pagination,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconEdit, IconTrash, IconArrowLeft } from '@tabler/icons-react';
+import { IconPlus, IconEdit, IconTrash, IconSearch } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { listServices, createService, updateService, deleteService } from '../api/services.js';
 import { listOptionLists } from '../api/optionLists.js';
 import { listServiceShortcuts, createServiceShortcut, updateServiceShortcut, deleteServiceShortcut } from '../api/serviceShortcuts.js';
 import { apiErrorMessage } from '../lib/apiError.js';
 import { ServiceFieldInput } from '../components/ServiceFieldInputs.jsx';
 import OptionListSection from '../components/OptionListSection.jsx';
+import BilingualOptionsEditor from '../components/BilingualOptionsEditor.jsx';
 
 const BLANK_FIELD = () => ({
   _uid: crypto.randomUUID(),
@@ -56,8 +56,7 @@ const COLOR_SWATCHES = [
 export default function ManageServices() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const navigate = useNavigate();
-
+  const { colorScheme } = useMantineColorScheme();
   const [services, setServices] = useState([]);
   const [optionLists, setOptionLists] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -72,6 +71,30 @@ export default function ManageServices() {
   const [editingShortcut, setEditingShortcut] = useState(null);
   const [shortcutEditorOpened, shortcutEditorHandlers] = useDisclosure(false);
   const [shortcutSaving, setShortcutSaving] = useState(false);
+  const [svcToDelete, setSvcToDelete] = useState(null);
+  const [deleteSvcOpened, deleteSvcHandlers] = useDisclosure(false);
+  const [selectedSvc, setSelectedSvc] = useState(new Set());
+  const [bulkDeleteSvcOpened, bulkDeleteSvcHandlers] = useDisclosure(false);
+  const [bulkDeletingSvc, setBulkDeletingSvc] = useState(false);
+
+  const [scToDelete, setScToDelete] = useState(null);
+  const [deleteScOpened, deleteScHandlers] = useDisclosure(false);
+  const [selectedSc, setSelectedSc] = useState(new Set());
+  const [bulkDeleteScOpened, bulkDeleteScHandlers] = useDisclosure(false);
+  const [bulkDeletingSc, setBulkDeletingSc] = useState(false);
+
+  // Services table pagination
+  const SVC_PAGE_SIZE = 10;
+  const [svcPage, setSvcPage] = useState(1);
+
+  // Shortcuts table controls
+  const SC_PAGE_SIZE = 10;
+  const [scSearch, setScSearch] = useState('');
+  const [scServiceFilter, setScServiceFilter] = useState(null);
+  const [scPage, setScPage] = useState(1);
+
+  const [fieldOptionsErrors, setFieldOptionsErrors] = useState([]);
+
   const [presetValues, setPresetValues] = useState({});
   const [presetCost, setPresetCost] = useState('');
 
@@ -100,11 +123,11 @@ export default function ManageServices() {
   });
 
   const reloadShortcuts = () => {
-    listServiceShortcuts().then(setShortcuts).catch(() => {});
+    listServiceShortcuts().then((data) => { setShortcuts(data); setSelectedSc(new Set()); }).catch(() => {});
   };
 
   const load = () => {
-    listServices().then(setServices).catch(() => {});
+    listServices().then((data) => { setServices(data); setSelectedSvc(new Set()); }).catch(() => {});
     listOptionLists().then(setOptionLists).catch(() => {});
     reloadShortcuts();
   };
@@ -146,6 +169,14 @@ export default function ManageServices() {
     form.setFieldValue(`fields.${index}.${prop}`, value);
   };
 
+  const validateInlineOptions = (options) => {
+    const enNames = options.map((o) => (o.name_en || '').trim().toLowerCase()).filter(Boolean);
+    if (new Set(enNames).size !== enNames.length) return t('lists.optionDupEn');
+    const arNames = options.map((o) => (o.name_ar || '').trim()).filter(Boolean);
+    if (new Set(arNames).size !== arNames.length) return t('lists.optionDupAr');
+    return null;
+  };
+
   const submit = async (values) => {
     const invalidSelect = values.fields.find(
       (f) => f.type === 'select' && !f.option_list_id && (!f.options || f.options.length === 0)
@@ -154,6 +185,15 @@ export default function ManageServices() {
       notifications.show({ message: t('manageServices.selectNeedsOptions'), color: 'red' });
       return;
     }
+
+    const optErrors = values.fields.map((f) =>
+      f.type === 'select' && f._source !== 'shared' ? validateInlineOptions(f.options || []) : null
+    );
+    if (optErrors.some(Boolean)) {
+      setFieldOptionsErrors(optErrors);
+      return;
+    }
+    setFieldOptionsErrors([]);
     setSaving(true);
     try {
       // Normalize fields: strip _source and _uid, resolve option_list_id vs options
@@ -181,20 +221,55 @@ export default function ManageServices() {
       handlers.close();
       load();
     } catch (err) {
-      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+      const code = err?.response?.data?.code;
+      if (code === 'service_name_en_taken') {
+        form.setFieldError('name_en', t('errors.service_name_en_taken'));
+      } else if (code === 'service_name_ar_taken') {
+        form.setFieldError('name_ar', t('errors.service_name_ar_taken'));
+      } else {
+        notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (svc) => {
-    if (!window.confirm(t('manageServices.deleteConfirm'))) return;
+  const handleDelete = (svc) => {
+    setSvcToDelete(svc);
+    deleteSvcHandlers.open();
+  };
+
+  const confirmDeleteService = async () => {
+    deleteSvcHandlers.close();
     try {
-      await deleteService(svc.id);
+      await deleteService(svcToDelete.id);
+      notifications.show({ message: t('common.deleted'), color: 'green' });
+      load();
+      reloadShortcuts();
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setSvcToDelete(null);
+    }
+  };
+
+  const toggleSelectSvc = (id) => setSelectedSvc((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const allSvcSelected = services.length > 0 && services.every((s) => selectedSvc.has(s.id));
+  const toggleSelectAllSvc = () => setSelectedSvc(() => {
+    if (allSvcSelected) return new Set();
+    return new Set(services.map((s) => s.id));
+  });
+  const confirmBulkDeleteSvc = async () => {
+    bulkDeleteSvcHandlers.close();
+    setBulkDeletingSvc(true);
+    try {
+      await Promise.all([...selectedSvc].map((id) => deleteService(id)));
       notifications.show({ message: t('common.deleted'), color: 'green' });
       load();
     } catch (err) {
       notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setBulkDeletingSvc(false);
     }
   };
 
@@ -254,26 +329,74 @@ export default function ManageServices() {
       shortcutEditorHandlers.close();
       reloadShortcuts();
     } catch (err) {
-      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+      const code = err?.response?.data?.code;
+      if (code === 'shortcut_label_en_taken') {
+        shortcutForm.setFieldError('label_en', t('errors.shortcut_label_en_taken'));
+      } else if (code === 'shortcut_label_ar_taken') {
+        shortcutForm.setFieldError('label_ar', t('errors.shortcut_label_ar_taken'));
+      } else {
+        notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+      }
     } finally {
       setShortcutSaving(false);
     }
   };
 
-  const handleDeleteShortcut = async (sc) => {
-    if (!window.confirm(t('manageServices.deleteShortcutConfirm'))) return;
+  const handleDeleteShortcut = (sc) => {
+    setScToDelete(sc);
+    deleteScHandlers.open();
+  };
+
+  const confirmDeleteShortcut = async () => {
+    deleteScHandlers.close();
     try {
-      await deleteServiceShortcut(sc.id);
+      await deleteServiceShortcut(scToDelete.id);
       notifications.show({ message: t('common.deleted'), color: 'green' });
       reloadShortcuts();
     } catch (err) {
       notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setScToDelete(null);
+    }
+  };
+
+  const toggleSelectSc = (id) => setSelectedSc((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const allScSelected = shortcuts.length > 0 && shortcuts.every((sc) => selectedSc.has(sc.id));
+  const toggleSelectAllSc = () => setSelectedSc(() => {
+    if (allScSelected) return new Set();
+    return new Set(shortcuts.map((sc) => sc.id));
+  });
+  const confirmBulkDeleteSc = async () => {
+    bulkDeleteScHandlers.close();
+    setBulkDeletingSc(true);
+    try {
+      await Promise.all([...selectedSc].map((id) => deleteServiceShortcut(id)));
+      notifications.show({ message: t('common.deleted'), color: 'green' });
+      reloadShortcuts();
+    } catch (err) {
+      notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
+    } finally {
+      setBulkDeletingSc(false);
     }
   };
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const localizedName = (svc) => (lang === 'ar' ? svc.name_ar : svc.name_en);
+
+  const filteredShortcuts = shortcuts.filter((sc) => {
+    if (scServiceFilter && sc.service_id !== Number(scServiceFilter)) return false;
+    if (scSearch.trim()) {
+      const q = scSearch.toLowerCase();
+      return sc.label_en.toLowerCase().includes(q) || sc.label_ar.toLowerCase().includes(q);
+    }
+    return true;
+  });
+  const svcTotalPages = Math.max(1, Math.ceil(services.length / SVC_PAGE_SIZE));
+  const paginatedServices = services.slice((svcPage - 1) * SVC_PAGE_SIZE, svcPage * SVC_PAGE_SIZE);
+
+  const scTotalPages = Math.max(1, Math.ceil(filteredShortcuts.length / SC_PAGE_SIZE));
+  const paginatedShortcuts = filteredShortcuts.slice((scPage - 1) * SC_PAGE_SIZE, scPage * SC_PAGE_SIZE);
 
   const optionListData = optionLists.map((ol) => ({
     value: String(ol.id),
@@ -295,53 +418,75 @@ export default function ManageServices() {
 
   return (
     <Stack>
-      <Group justify="space-between">
-        <Title order={2}>{t('manageServices.title')}</Title>
-        <Group>
-          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate('/new-transaction')}>
-            {t('manageServices.backToServices')}
-          </Button>
-          <Button leftSection={<IconPlus size={18} />} onClick={openNew}>
-            {t('manageServices.addService')}
-          </Button>
-        </Group>
-      </Group>
+      <Title order={2}>{t('manageServices.title')}</Title>
 
-      <Paper withBorder radius="md">
-        <Table highlightOnHover verticalSpacing="sm">
+      <Paper withBorder p="md" radius="md">
+        <Group justify="space-between" mb="sm">
+          <Title order={4}>{t('manageServices.servicesLabel')}</Title>
+          <Group gap="xs">
+            {selectedSvc.size > 0 && (
+              <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} loading={bulkDeletingSvc} onClick={bulkDeleteSvcHandlers.open}>
+                {t('lists.bulkDelete')} ({selectedSvc.size})
+              </Button>
+            )}
+            <Button size="xs" variant={allSvcSelected ? 'filled' : 'default'} onClick={toggleSelectAllSvc}>
+              {allSvcSelected ? t('common.deselectAll') : t('common.selectAll')}
+            </Button>
+            <Button size="xs" leftSection={<IconPlus size={16} />} onClick={openNew}>
+              {t('manageServices.addService')}
+            </Button>
+          </Group>
+        </Group>
+        <Table highlightOnHover verticalSpacing="sm" styles={{ td: { fontWeight: 500 } }}>
           <Table.Thead>
-            <Table.Tr>
+            <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
+              <Table.Th w={40} />
               <Table.Th>{t('services.nameEn')}</Table.Th>
               <Table.Th>{t('services.nameAr')}</Table.Th>
               <Table.Th>{t('manageServices.fields')}</Table.Th>
+              <Table.Th>{t('manageServices.shortcutsCol')}</Table.Th>
               <Table.Th>{t('common.actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {services.map((svc) => (
-              <Table.Tr key={svc.id}>
-                <Table.Td>{svc.name_en}</Table.Td>
-                <Table.Td>{svc.name_ar}</Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed">
-                    {(svc.fields || []).length} {t('manageServices.fieldCount')}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4} wrap="nowrap">
-                    <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
-                      <IconEdit size={16} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(svc)}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-            {services.length === 0 && (
+            {paginatedServices.map((svc) => {
+              const svcShortcutCount = shortcuts.filter((sc) => sc.service_id === svc.id).length;
+              return (
+                <Table.Tr key={svc.id} bg={selectedSvc.has(svc.id) ? 'var(--mantine-color-indigo-light)' : undefined}>
+                  <Table.Td>
+                    <Checkbox checked={selectedSvc.has(svc.id)} onChange={() => toggleSelectSvc(svc.id)} size="sm" />
+                  </Table.Td>
+                  <Table.Td>{svc.name_en}</Table.Td>
+                  <Table.Td>{svc.name_ar}</Table.Td>
+                  <Table.Td>
+                    <Text size="sm" fw={700} c="dimmed">{(svc.fields || []).length}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={6} wrap="nowrap">
+                      <ActionIcon variant="light" size="sm" onClick={() => openNewShortcut(svc)}>
+                        <IconPlus size={14} />
+                      </ActionIcon>
+                      {svcShortcutCount > 0 && (
+                        <Text size="sm" fw={700} c="dimmed">{svcShortcutCount}</Text>
+                      )}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4} wrap="nowrap">
+                      <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(svc)}>
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
+            {paginatedServices.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={4}>
+                <Table.Td colSpan={6}>
                   <Center p="lg">
                     <Text c="dimmed">{t('common.noResults')}</Text>
                   </Center>
@@ -350,74 +495,106 @@ export default function ManageServices() {
             )}
           </Table.Tbody>
         </Table>
+        {svcTotalPages > 1 && (
+          <Group justify="center" mt="md">
+            <Pagination value={svcPage} onChange={setSvcPage} total={svcTotalPages} size="sm" />
+          </Group>
+        )}
       </Paper>
 
-      {/* ── Inline shortcuts section ───────────────────────────────────────── */}
-      {services.map((svc) => {
-        const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
-        return (
-          <Box key={svc.id}>
-            <Divider
-              label={
-                <Group gap="xs">
-                  <Text size="sm" fw={500}>{t('manageServices.shortcuts')} — {localizedName(svc)}</Text>
-                </Group>
-              }
-              labelPosition="left"
-              mb="sm"
-            />
-            <Stack gap="xs" mb="xs">
-              {svcShortcuts.length === 0 && (
-                <Text size="sm" c="dimmed" px="xs">{t('manageServices.noShortcuts')}</Text>
+      {/* ── All shortcuts in one table ────────────────────────────────────── */}
+      {shortcuts.length > 0 && (
+        <Paper withBorder p="md" radius="md">
+          <Group justify="space-between" mb="sm">
+            <Title order={4}>{t('manageServices.shortcuts')}</Title>
+            <Group gap="xs">
+              {selectedSc.size > 0 && (
+                <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} loading={bulkDeletingSc} onClick={bulkDeleteScHandlers.open}>
+                  {t('lists.bulkDelete')} ({selectedSc.size})
+                </Button>
               )}
-              {svcShortcuts.map((sc) => (
-                <Paper key={sc.id} withBorder p="sm" radius="sm">
-                  <Group justify="space-between" wrap="nowrap">
-                    <Group gap="sm" wrap="nowrap">
-                      {sc.color && (
-                        <ColorSwatch color={sc.color} size={18} />
-                      )}
-                      <div>
-                        <Text size="sm" fw={500}>
-                          {lang === 'ar' ? sc.label_ar : sc.label_en}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {lang === 'ar' ? sc.label_en : sc.label_ar}
-                        </Text>
-                      </div>
-                      {sc.preset_values && Object.keys(sc.preset_values).length > 0 && (
-                        <Badge variant="light" size="xs">
-                          {t('manageServices.presetsCount', { count: Object.keys(sc.preset_values).length })}
-                        </Badge>
-                      )}
-                    </Group>
-                    <Group gap={4} wrap="nowrap">
-                      <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => handleDeleteShortcut(sc)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-                </Paper>
-              ))}
-            </Stack>
-            <Button
-              variant="light"
-              size="xs"
-              leftSection={<IconPlus size={14} />}
-              onClick={() => openNewShortcut(svc)}
-            >
-              {t('manageServices.addShortcut')}
-            </Button>
-          </Box>
-        );
-      })}
+              <Button size="xs" variant={allScSelected ? 'filled' : 'default'} onClick={toggleSelectAllSc}>
+                {allScSelected ? t('common.deselectAll') : t('common.selectAll')}
+              </Button>
+            </Group>
+          </Group>
+          <Group mb="sm" grow>
+            <TextInput
+              leftSection={<IconSearch size={16} />}
+              placeholder={t('manageServices.searchShortcuts')}
+              value={scSearch}
+              onChange={(e) => { setScSearch(e.currentTarget.value); setScPage(1); }}
+            />
+            <Select
+              placeholder={t('manageServices.allServices')}
+              data={services.map((s) => ({ value: String(s.id), label: localizedName(s) }))}
+              value={scServiceFilter}
+              onChange={(v) => { setScServiceFilter(v); setScPage(1); }}
+              clearable
+            />
+          </Group>
+          <Table highlightOnHover verticalSpacing="sm" styles={{ td: { fontWeight: 500 } }}>
+            <Table.Thead>
+              <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
+                <Table.Th w={40} />
+                <Table.Th>{t('services.nameEn')}</Table.Th>
+                <Table.Th>{t('services.nameAr')}</Table.Th>
+                <Table.Th>{t('txnType.service')}</Table.Th>
+                <Table.Th>{t('manageServices.color')}</Table.Th>
+                <Table.Th>{t('common.actions')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {paginatedShortcuts.map((sc) => {
+                const svc = services.find((s) => s.id === sc.service_id);
+                return (
+                  <Table.Tr key={sc.id} bg={selectedSc.has(sc.id) ? 'var(--mantine-color-indigo-light)' : undefined}>
+                    <Table.Td>
+                      <Checkbox checked={selectedSc.has(sc.id)} onChange={() => toggleSelectSc(sc.id)} size="sm" />
+                    </Table.Td>
+                    <Table.Td>{sc.label_en}</Table.Td>
+                    <Table.Td>{sc.label_ar}</Table.Td>
+                    <Table.Td>
+                      {svc
+                        ? localizedName(svc)
+                        : <Text size="sm" c="dimmed">—</Text>}
+                    </Table.Td>
+                    <Table.Td>
+                      {sc.color
+                        ? <ColorSwatch color={sc.color} size={18} />
+                        : <Text size="sm" c="dimmed">—</Text>}
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4} wrap="nowrap">
+                        <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteShortcut(sc)}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+              {paginatedShortcuts.length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={6}>
+                    <Center p="lg">
+                      <Text c="dimmed">{t('common.noResults')}</Text>
+                    </Center>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+          {scTotalPages > 1 && (
+            <Group justify="center" mt="md">
+              <Pagination value={scPage} onChange={setScPage} total={scTotalPages} size="sm" />
+            </Group>
+          )}
+        </Paper>
+      )}
 
       {/* ── Service edit modal ─────────────────────────────────────────────── */}
       <Modal
@@ -515,11 +692,13 @@ export default function ManageServices() {
                         clearable
                       />
                     ) : (
-                      <TagsInput
-                        placeholder={t('lists.optionsHint')}
-                        description={t('lists.optionsHint')}
+                      <BilingualOptionsEditor
                         value={field.options || []}
-                        onChange={(v) => setFieldProp(index, 'options', v)}
+                        onChange={(v) => {
+                          setFieldProp(index, 'options', v);
+                          setFieldOptionsErrors((prev) => { const next = [...prev]; next[index] = null; return next; });
+                        }}
+                        error={fieldOptionsErrors[index]}
                       />
                     )}
                   </Stack>
@@ -550,7 +729,7 @@ export default function ManageServices() {
       </Modal>
 
       {/* ── Option Lists ──────────────────────────────────────────────────── */}
-      <OptionListSection />
+      <OptionListSection onUpdate={() => listOptionLists().then(setOptionLists).catch(() => {})} />
 
       {/* ── Shortcut editor modal ──────────────────────────────────────────── */}
       <Modal
@@ -619,6 +798,105 @@ export default function ManageServices() {
             </Button>
           </Group>
         </form>
+      </Modal>
+
+      {/* ── Bulk delete services modal ─────────────────────────────────────── */}
+      <Modal opened={bulkDeleteSvcOpened} onClose={bulkDeleteSvcHandlers.close} title={t('lists.bulkDeleteTitle')} size="sm">
+        {(() => {
+          const svcsWithSc = services.filter((s) => selectedSvc.has(s.id) && shortcuts.some((sc) => sc.service_id === s.id));
+          const affectedScCount = shortcuts.filter((sc) => selectedSvc.has(sc.service_id)).length;
+          return (
+            <>
+              <Text mb={svcsWithSc.length > 0 ? 'sm' : 'xl'}>{t('lists.bulkDeleteConfirm', { count: selectedSvc.size })}</Text>
+              {svcsWithSc.length > 0 && (
+                <>
+                  <Text size="sm" c="orange" mb="xs">
+                    {t('manageServices.bulkDeleteServiceShortcutsWarning', { count: affectedScCount })}
+                  </Text>
+                  <Stack gap={2} mb="xl">
+                    {svcsWithSc.map((s) => {
+                      const sc = shortcuts.filter((sc) => sc.service_id === s.id).length;
+                      return (
+                        <Text key={s.id} size="sm" c="orange">
+                          {'• '}{lang === 'ar' ? s.name_ar : s.name_en}{' ('}{sc}{')'}
+                        </Text>
+                      );
+                    })}
+                  </Stack>
+                </>
+              )}
+            </>
+          );
+        })()}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={bulkDeleteSvcHandlers.close}>{t('common.cancel')}</Button>
+          <Button color="red" loading={bulkDeletingSvc} onClick={confirmBulkDeleteSvc}>{t('common.delete')}</Button>
+        </Group>
+      </Modal>
+
+      {/* ── Bulk delete shortcuts modal ─────────────────────────────────────── */}
+      <Modal opened={bulkDeleteScOpened} onClose={bulkDeleteScHandlers.close} title={t('lists.bulkDeleteTitle')} size="sm">
+        <Text mb="xl">{t('lists.bulkDeleteConfirm', { count: selectedSc.size })}</Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={bulkDeleteScHandlers.close}>{t('common.cancel')}</Button>
+          <Button color="red" loading={bulkDeletingSc} onClick={confirmBulkDeleteSc}>{t('common.delete')}</Button>
+        </Group>
+      </Modal>
+
+      {/* ── Delete service confirm modal ───────────────────────────────────── */}
+      <Modal
+        opened={deleteSvcOpened}
+        onClose={deleteSvcHandlers.close}
+        title={t('common.delete')}
+        size="sm"
+      >
+        <Text mb="md">{t('manageServices.deleteConfirm')}</Text>
+        {svcToDelete && (() => {
+          const scCount = shortcuts.filter((sc) => sc.service_id === svcToDelete.id).length;
+          return (
+            <>
+              <Text fw={600} mb={scCount > 0 ? 'sm' : 'xl'}>
+                {lang === 'ar' ? svcToDelete.name_ar : svcToDelete.name_en}
+              </Text>
+              {scCount > 0 && (
+                <Text size="sm" c="orange" mb="xl">
+                  {t('manageServices.deleteServiceShortcutsWarning', { count: scCount })}
+                </Text>
+              )}
+            </>
+          );
+        })()}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={deleteSvcHandlers.close}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="red" onClick={confirmDeleteService}>
+            {t('common.delete')}
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* ── Delete shortcut confirm modal ──────────────────────────────────── */}
+      <Modal
+        opened={deleteScOpened}
+        onClose={deleteScHandlers.close}
+        title={t('common.delete')}
+        size="sm"
+      >
+        <Text mb="md">{t('manageServices.deleteShortcutConfirm')}</Text>
+        {scToDelete && (
+          <Text fw={600} mb="xl">
+            {lang === 'ar' ? scToDelete.label_ar : scToDelete.label_en}
+          </Text>
+        )}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={deleteScHandlers.close}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="red" onClick={confirmDeleteShortcut}>
+            {t('common.delete')}
+          </Button>
+        </Group>
       </Modal>
     </Stack>
   );

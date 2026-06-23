@@ -5,9 +5,9 @@
   "nav": {
     "dashboard": "لوحة المعلومات",
     "inventory": "المخزون",
-    "newTransaction": "معاملة جديدة",
+    "newTransaction": "إدارة المعاملات",
     "transactions": "المعاملات",
-    "services": "الخدمات",
+    "services": "إدارة الخدمات",
     "lists": "الأقسام والعلامات التجارية",
     "settings": "الإعدادات",
     "activityLog": "سجل النشاط",
@@ -162,12 +162,12 @@
   "txnType": {
     "purchase": "شراء",
     "sale": "بيع",
-    "service": "خدمة"
+    "service": "الخدمة"
   },
   "newTxn": {
-    "title": "معاملة جديدة",
+    "title": "إدارة المعاملات",
     "type": "النوع",
-    "scanToAdd": "امسح أو اكتب الباركود ثم اضغط Enter",
+    "scanToAdd": "امسح الباركود أو اكتب اسم المنتج ثم اضغط Enter",
     "manualAdd": "إضافة عنصر يدويًا",
     "cart": "العناصر",
     "empty": "لا توجد عناصر بعد. امسح باركود للإضافة.",
@@ -183,7 +183,11 @@
     "note": "ملاحظة",
     "record": "تسجيل المعاملة",
     "recorded": "تم تسجيل المعاملة",
-    "notFoundQuickAdd": "الباركود غير موجود — تمت إضافته كعنصر جديد، عدّل التفاصيل أدناه",
+    "barcodeNotFound": "الباركود غير موجود في المخزون",
+    "productNotFound": "لا يوجد منتج مطابق لهذا الباركود أو الاسم",
+    "selectProduct": "اختر منتجاً",
+    "inStock": "المتاح",
+    "insufficientStock": "الكمية تتجاوز المخزون المتاح",
     "newItemName": "اسم العنصر الجديد",
     "remove": "إزالة"
   },
@@ -227,6 +231,12 @@
     "service_missing": "الخدمة غير موجودة",
     "service_cost_positive": "التكلفة يجب أن تكون أكبر من صفر",
     "service_field_required": "حقل مطلوب غير مكتمل",
+    "service_name_en_taken": "يوجد خدمة بهذا الاسم",
+    "service_name_ar_taken": "يوجد خدمة بهذا الاسم",
+    "service_field_label_en_dup": "اسماء الحقول يجب ان تكن غير مكرره",
+    "service_field_label_ar_dup": "اسماء الحقول يجب ان تكن غير مكرره",
+    "shortcut_label_en_taken": "يوجد اختصار بهذا الاسم",
+    "shortcut_label_ar_taken": "يوجد اختصار بهذا الاسم",
     "auth_required": "مطلوب تسجيل الدخول",
     "auth_invalid": "جلسة غير صالحة أو منتهية",
     "auth_forbidden": "هذا الإجراء للمسؤول فقط",
@@ -245,7 +255,12 @@
     "auth_use_change_password": "استخدم قائمة الحساب لتغيير كلمة مرورك",
     "user_not_found": "المستخدم غير موجود",
     "user_status_invalid": "قيمة الحالة غير صالحة",
-    "user_cannot_disable_self": "لا يمكنك تعطيل حسابك الخاص"
+    "user_cannot_disable_self": "لا يمكنك تعطيل حسابك الخاص",
+    "optlist_in_use": "لا يمكن الحذف — مستخدمة في {{n}} خدمة",
+    "optlist_name_en_duplicate": "هذا الاسم مستخدم في قائمة أخرى",
+    "optlist_name_ar_duplicate": "هذا الاسم مستخدم في قائمة أخرى",
+    "optlist_option_dup_en": "اسم الخيار الإنجليزي مكرر",
+    "optlist_option_dup_ar": "اسم الخيار العربي مكرر"
   },
   "lists": {
     "title": "الأقسام والعلامات التجارية",
@@ -268,14 +283,21 @@
     "unitsCount": "عدد القطع",
     "bulkDelete": "حذف المحدد",
     "bulkDeleteTitle": "حذف جماعي",
+    "bulkDeleteConfirm": "حذف {{count}} عناصر؟",
     "bulkDeleteHasProducts": "لا يمكن حذف هذا العنصر لأنه مرتبط بمنتجات حالية.\nيرجى نقل هذه المنتجات أو حذفها أولاً.",
     "searchPlaceholder": "ابحث في الأقسام والعلامات التجارية...",
     "optionLists": "قوائم الخيارات",
+    "inUseTitle": "لا يمكن الحذف",
+    "inUseBy": "مستخدمة في:",
     "addOptionList": "إضافة قائمة خيارات",
     "newOptionList": "قائمة خيارات جديدة",
     "editOptionList": "تعديل قائمة الخيارات",
     "optionsLabel": "الخيارات",
-    "optionsHint": "اكتب خيارًا واضغط Enter"
+    "optionsRequired": "أضف خيارًا واحدًا على الأقل",
+    "addOption": "إضافة خيار",
+    "optionDupEn": "يوجد اسم خيار مكرر",
+    "optionDupAr": "يوجد اسم خيار مكرر",
+    "optionNameRequired": "كلا الاسمين مطلوبان"
   },
   "dashboard": {
     "title": "لوحة المعلومات",
@@ -298,6 +320,7 @@
   },
   "manageServices": {
     "title": "إدارة الخدمات",
+    "servicesLabel": "الخدمات",
     "addService": "إضافة خدمة",
     "newService": "خدمة جديدة",
     "editService": "تعديل الخدمة",
@@ -310,13 +333,16 @@
     "typeSelect": "قائمة",
     "required": "مطلوب",
     "optionSource": "مصدر الخيارات",
-    "sharedList": "قائمة مشتركة",
+    "sharedList": "قائمة جاهزة",
     "inlineOptions": "خيارات مباشرة",
     "backToServices": "العودة للمعاملة الجديدة",
     "fieldCount": "حقول",
     "deleteConfirm": "حذف هذه الخدمة؟",
+    "deleteServiceShortcutsWarning": "هذه الخدمة تحتوي على {{count}} اختصار سيتم حذفه أيضاً.",
+    "bulkDeleteServiceShortcutsWarning": "الخدمات المحددة تحتوي على {{count}} اختصار سيتم حذفه أيضاً.",
     "selectNeedsOptions": "حقل القائمة يحتاج قائمة مشتركة أو خيارًا واحدًا على الأقل",
-    "shortcuts": "الاختصارات",
+    "shortcuts": "اختصارات الخدمات",
+    "shortcutsCol": "اختصارات الخدمة",
     "addShortcut": "إضافة اختصار",
     "newShortcut": "اختصار جديد",
     "editShortcut": "تعديل الاختصار",
@@ -325,7 +351,9 @@
     "presetCost": "التكلفة المسبقة",
     "noShortcuts": "لا توجد اختصارات بعد",
     "deleteShortcutConfirm": "حذف هذا الاختصار؟",
-    "presetsCount": "{{count}} قيمة مسبقة"
+    "presetsCount": "{{count}} قيمة مسبقة",
+    "allServices": "كل الخدمات",
+    "searchShortcuts": "بحث في الاختصارات..."
   },
   "users": {
     "title": "المستخدمون",
