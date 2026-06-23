@@ -58,6 +58,10 @@ router.get('/lookup', (req, res) => {
   res.json(product);
 });
 
+router.get('/search', (req, res) => {
+  res.json(products.searchByName(req.query.q || ''));
+});
+
 router.get('/:id', (req, res) => {
   const product = products.getById(Number(req.params.id));
   if (!product) return res.status(404).json({ error: 'Not found' });

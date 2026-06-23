@@ -32,6 +32,13 @@ export function findByBarcode(barcode) {
   return getDb().prepare(`${SELECT_WITH_NAMES} WHERE p.barcode = ?`).get(barcode);
 }
 
+export function searchByName(query) {
+  if (!query) return [];
+  return getDb()
+    .prepare(`${SELECT_WITH_NAMES} WHERE p.is_temporary = 0 AND p.name LIKE ? ORDER BY p.name LIMIT 10`)
+    .all(`%${query}%`);
+}
+
 /**
  * Validates manual product input (the product form / API). Enforces a unique
  * name (case-insensitive, excluding temporary quick-add items), positive prices,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { forwardRef, useState } from 'react';
 import { TextInput } from '@mantine/core';
 import { IconBarcode } from '@tabler/icons-react';
 
@@ -7,7 +7,7 @@ import { IconBarcode } from '@tabler/icons-react';
  * code then sends Enter, which fires onScan(value) and clears the field.
  * Also usable by hand. `autoFocus` keeps it ready for the next scan.
  */
-export default function BarcodeInput({ onScan, placeholder, autoFocus = true, ...props }) {
+const BarcodeInput = forwardRef(function BarcodeInput({ onScan, placeholder, autoFocus = true, ...props }, ref) {
   const [value, setValue] = useState('');
 
   const submit = () => {
@@ -18,6 +18,7 @@ export default function BarcodeInput({ onScan, placeholder, autoFocus = true, ..
 
   return (
     <TextInput
+      ref={ref}
       leftSection={<IconBarcode size={18} />}
       placeholder={placeholder}
       value={value}
@@ -32,4 +33,6 @@ export default function BarcodeInput({ onScan, placeholder, autoFocus = true, ..
       {...props}
     />
   );
-}
+});
+
+export default BarcodeInput;

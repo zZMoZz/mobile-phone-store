@@ -20,6 +20,11 @@ export async function lookupByBarcode(barcode) {
   return data;
 }
 
+export async function searchProducts(q) {
+  const { data } = await api.get('/products/search', { params: { q } });
+  return data;
+}
+
 export async function createProduct(body) {
   const { data } = await api.post('/products', body);
   return data;

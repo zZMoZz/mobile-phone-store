@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Title,
   Stack,
@@ -23,10 +22,10 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconTrash, IconPlus, IconDeviceFloppy, IconSettings } from '@tabler/icons-react';
+import { IconTrash, IconPlus, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import BarcodeInput from '../components/BarcodeInput.jsx';
-import { lookupByBarcode } from '../api/products.js';
+import { lookupByBarcode, searchProducts } from '../api/products.js';
 import { listTransactions, getTransaction, createTransaction } from '../api/transactions.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
 import ServiceRecorder from '../components/ServiceRecorder.jsx';
@@ -41,7 +40,6 @@ const nextKey = () => `line-${lineCounter++}`;
 export default function NewTransaction() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const navigate = useNavigate();
   const { isAdmin } = useAuth();
 
   // --- New transaction form ---
@@ -60,6 +58,48 @@ export default function NewTransaction() {
 
   const [detail, setDetail] = useState(null);
   const [opened, handlers] = useDisclosure(false);
+
+  const [searchResults, setSearchResults] = useState([]);
+  const [pickerOpened, pickerHandlers] = useDisclosure(false);
+
+  // Keep barcode input focused whenever nothing else has focus (scanner-first).
+  const barcodeRef = useRef(null);
+  // Combined ref so the focusout closure always sees the latest modal state
+  // without re-registering the listener on every open/close toggle.
+  const anyModalOpen = opened || pickerOpened;
+  const anyModalOpenRef = useRef(anyModalOpen);
+  anyModalOpenRef.current = anyModalOpen;
+  // True while a detail fetch is in-flight — openDetail is async so the modal
+  // isn't open yet when focusout fires; this prevents the premature refocus.
+  const detailPending = useRef(false);
+
+  useEffect(() => {
+    barcodeRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const refocusIfIdle = () => {
+      // 50 ms lets React flush the state update triggered by a row click
+      // before we check whether a modal just opened.
+      setTimeout(() => {
+        if (anyModalOpenRef.current || detailPending.current) return;
+        const active = document.activeElement;
+        if (!active || active === document.body) {
+          barcodeRef.current?.focus();
+        }
+      }, 50);
+    };
+    document.addEventListener('focusout', refocusIfIdle);
+    return () => document.removeEventListener('focusout', refocusIfIdle);
+  }, []);
+
+  const prevModalOpen = useRef(anyModalOpen);
+  useEffect(() => {
+    if (prevModalOpen.current && !anyModalOpen) {
+      setTimeout(() => barcodeRef.current?.focus(), 0);
+    }
+    prevModalOpen.current = anyModalOpen;
+  }, [anyModalOpen]);
 
   const historyQuery = useMemo(
     () => ({
@@ -81,9 +121,13 @@ export default function NewTransaction() {
   }, [filterType, from, to]);
 
   const openDetail = async (id) => {
-    const txn = await getTransaction(id);
-    setDetail(txn);
-    handlers.open();
+    try {
+      const txn = await getTransaction(id);
+      setDetail(txn);
+      handlers.open();
+    } finally {
+      detailPending.current = false;
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(historyData.total / PAGE_SIZE));
@@ -93,29 +137,30 @@ export default function NewTransaction() {
 
   const addLine = (line) => setLines((prev) => [...prev, { key: nextKey(), ...line }]);
 
+  const addProductLine = (product) =>
+    addLine({
+      product_id: product.id,
+      name: product.name,
+      barcode: product.barcode,
+      quantity: 1,
+      unit_price: priceFor(product),
+      unit_cost: product.buying_price,
+      stock: product.quantity,
+      locked: true,
+    });
+
   const handleScan = async (code) => {
-    const product = await lookupByBarcode(code).catch(() => null);
-    if (product) {
-      addLine({
-        product_id: product.id,
-        name: product.name,
-        barcode: product.barcode,
-        quantity: 1,
-        unit_price: priceFor(product),
-        unit_cost: product.buying_price,
-        locked: true,
-      });
+    const byBarcode = await lookupByBarcode(code).catch(() => null);
+    if (byBarcode) { addProductLine(byBarcode); return; }
+
+    const results = await searchProducts(code).catch(() => []);
+    if (results.length === 1) {
+      addProductLine(results[0]);
+    } else if (results.length > 1) {
+      setSearchResults(results);
+      pickerHandlers.open();
     } else {
-      addLine({
-        product_id: null,
-        name: '',
-        barcode: code,
-        quantity: 1,
-        unit_price: 0,
-        unit_cost: 0,
-        locked: false,
-      });
-      notifications.show({ message: t('newTxn.notFoundQuickAdd'), color: 'yellow' });
+      notifications.show({ message: t('newTxn.productNotFound'), color: 'red' });
     }
   };
 
@@ -137,7 +182,11 @@ export default function NewTransaction() {
   const canSubmit =
     !saving &&
     lines.length > 0 &&
-    lines.every((l) => l.product_id || (l.name && l.name.trim()));
+    lines.every((l) => {
+      if (!l.product_id && !(l.name && l.name.trim())) return false;
+      if (type === 'sale' && l.stock != null && Number(l.quantity) > l.stock) return false;
+      return true;
+    });
 
   const submit = async () => {
     setSaving(true);
@@ -171,6 +220,8 @@ export default function NewTransaction() {
     <Stack>
       <Title order={2}>{t('newTxn.title')}</Title>
 
+      <ServiceRecorder />
+
       <SegmentedControl
         value={type}
         onChange={(v) => {
@@ -180,31 +231,16 @@ export default function NewTransaction() {
         data={[
           { value: 'sale', label: t('txnType.sale') },
           { value: 'purchase', label: t('txnType.purchase') },
-          { value: 'service', label: t('txnType.service') },
         ]}
       />
 
-      {type === 'service' ? (
-        <>
-          <Group justify="flex-end">
-            <Button
-              variant="default"
-              size="xs"
-              leftSection={<IconSettings size={16} />}
-              onClick={() => navigate('/services/manage')}
-            >
-              {t('services.manage')}
-            </Button>
-          </Group>
-          <ServiceRecorder />
-        </>
-      ) : (
-        <>
-          <Paper withBorder p="md" radius="md">
+      <Paper withBorder p="md" radius="md">
             <Group align="flex-end" mb="sm">
               <BarcodeInput
+                ref={barcodeRef}
                 onScan={handleScan}
                 placeholder={t('newTxn.scanToAdd')}
+                autoFocus={false}
                 style={{ flex: 1 }}
               />
               <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
@@ -218,7 +254,6 @@ export default function NewTransaction() {
                   <Table.Th>{t('newTxn.item')}</Table.Th>
                   <Table.Th w={90}>{t('newTxn.quantity')}</Table.Th>
                   <Table.Th w={130}>{t('newTxn.unitPrice')}</Table.Th>
-                  {type !== 'purchase' && <Table.Th w={130}>{t('newTxn.unitCost')}</Table.Th>}
                   <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
                   <Table.Th w={48} />
                 </Table.Tr>
@@ -228,14 +263,17 @@ export default function NewTransaction() {
                   <Table.Tr key={l.key}>
                     <Table.Td>
                       {l.product_id ? (
-                        <Group gap={6}>
-                          <Text fw={500}>{l.name}</Text>
-                          {l.barcode ? (
-                            <Text size="xs" c="dimmed">
-                              {l.barcode}
+                        <Stack gap={2}>
+                          <Group gap={6}>
+                            <Text fw={500}>{l.name}</Text>
+                            {l.barcode && <Text size="xs" c="dimmed">{l.barcode}</Text>}
+                          </Group>
+                          {type === 'sale' && l.stock != null && (
+                            <Text size="xs" c={Number(l.quantity) > l.stock ? 'red' : 'dimmed'}>
+                              {t('newTxn.inStock')}: {formatNumber(l.stock, lang)}
                             </Text>
-                          ) : null}
-                        </Group>
+                          )}
+                        </Stack>
                       ) : (
                         <TextInput
                           placeholder={t('newTxn.newItemName')}
@@ -260,22 +298,6 @@ export default function NewTransaction() {
                         hideControls
                       />
                     </Table.Td>
-                    {type !== 'purchase' && (
-                      <Table.Td>
-                        {isAdmin ? (
-                          <NumberInput
-                            min={0}
-                            value={l.unit_cost}
-                            onChange={(v) => updateLine(l.key, { unit_cost: v })}
-                            hideControls
-                          />
-                        ) : (
-                          <Text style={{ filter: 'blur(4px)', userSelect: 'none' }}>
-                            {formatMoney(l.unit_cost, lang)}
-                          </Text>
-                        )}
-                      </Table.Td>
-                    )}
                     <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>
                     <Table.Td>
                       <ActionIcon variant="subtle" color="red" onClick={() => removeLine(l.key)}>
@@ -325,8 +347,6 @@ export default function NewTransaction() {
               </Button>
             </Group>
           </Paper>
-        </>
-      )}
 
       {/* Transaction history */}
       <Divider mt="md" />
@@ -376,7 +396,7 @@ export default function NewTransaction() {
             </Table.Thead>
             <Table.Tbody>
               {historyData.items.map((txn) => (
-                <Table.Tr key={txn.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(txn.id)}>
+                <Table.Tr key={txn.id} style={{ cursor: 'pointer' }} onMouseDown={() => { detailPending.current = true; }} onClick={() => openDetail(txn.id)}>
                   <Table.Td>{formatDate(txn.created_at, lang)}</Table.Td>
                   <Table.Td>
                     <Badge variant="light" color={typeColor(txn.type)}>
@@ -412,6 +432,27 @@ export default function NewTransaction() {
       <Group justify="flex-end">
         <Pagination total={totalPages} value={page} onChange={setPage} />
       </Group>
+
+      <Modal opened={pickerOpened} onClose={pickerHandlers.close} title={t('newTxn.selectProduct')} size="sm">
+        <Stack gap="xs">
+          {searchResults.map((p) => (
+            <Button
+              key={p.id}
+              variant="default"
+              justify="space-between"
+              fullWidth
+              rightSection={
+                <Text size="xs" c="dimmed">
+                  {t('newTxn.inStock')}: {formatNumber(p.quantity, lang)}
+                </Text>
+              }
+              onClick={() => { addProductLine(p); pickerHandlers.close(); }}
+            >
+              {p.name}
+            </Button>
+          ))}
+        </Stack>
+      </Modal>
 
       <Modal opened={opened} onClose={handlers.close} title={t('txns.details')} size="lg">
         {detail && (

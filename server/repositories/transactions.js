@@ -73,10 +73,10 @@ function round2(n) {
  * Resolves a line item to a product. Order of preference:
  *  1. product_id
  *  2. existing product by barcode
- *  3. create a new product (temporary for sales/services, normal for purchases)
- * Returns { product, created, isTemporary }.
+ *  3. null — free-form line with no inventory record
+ * Returns { product } where product may be null.
  */
-function resolveProduct(item, type) {
+function resolveProduct(item) {
   if (item.product_id) {
     const p = products.getById(item.product_id);
     if (!p) {
@@ -84,27 +84,16 @@ function resolveProduct(item, type) {
       err.status = 400;
       throw err;
     }
-    return { product: p, created: false };
+    return { product: p };
   }
 
   const barcode = item.barcode ? String(item.barcode).trim() : null;
   if (barcode) {
     const existing = products.findByBarcode(barcode);
-    if (existing) return { product: existing, created: false };
+    if (existing) return { product: existing };
   }
 
-  // No matching product: create one. Quick-add temp record for sales/services
-  // (e.g. a used phone never stocked); a real product for purchases.
-  const isTemporary = type !== 'purchase';
-  const created = products.create({
-    name: item.name || 'Unregistered item',
-    barcode,
-    selling_price: item.unit_price || 0,
-    buying_price: item.unit_cost || 0,
-    quantity: 0,
-    is_temporary: isTemporary,
-  });
-  return { product: created, created: true, isTemporary };
+  return { product: null };
 }
 
 // Builds + inserts a pure-revenue service transaction: total = cost, profit = 0,
@@ -209,21 +198,21 @@ export function create(payload) {
 
     for (const item of rawItems) {
       const quantity = Math.max(1, Number(item.quantity) || 1);
-      const { product, created, isTemporary } = resolveProduct(item, type);
+      const { product } = resolveProduct(item);
 
-      const unitPrice = round2(item.unit_price ?? product.selling_price);
+      const unitPrice = round2(item.unit_price ?? product?.selling_price ?? 0);
       const unitCost =
         item.unit_cost != null
           ? round2(item.unit_cost)
           : type === 'purchase'
             ? unitPrice
-            : round2(product.buying_price);
+            : round2(product?.buying_price ?? 0);
       const lineTotal = round2(unitPrice * quantity);
 
       itemStmt.run({
         transaction_id: transactionId,
-        product_id: product.id,
-        name_snapshot: product.name,
+        product_id: product?.id ?? null,
+        name_snapshot: product?.name ?? item.name ?? 'Unregistered item',
         quantity,
         unit_price: unitPrice,
         unit_cost: unitCost,
@@ -233,12 +222,20 @@ export function create(payload) {
       subtotal += lineTotal;
       costTotal += round2(unitCost * quantity);
 
-      // Stock movement. Newly quick-added temp products were created with qty 0
-      // and were never really in stock, so don't drive them negative.
-      if (type === 'purchase') {
-        products.adjustQuantity(product.id, quantity);
-      } else if (!(created && isTemporary)) {
-        products.adjustQuantity(product.id, -quantity);
+      if (product) {
+        if (type === 'purchase') {
+          products.adjustQuantity(product.id, quantity);
+        } else {
+          if (product.quantity < quantity) {
+            const err = new Error(
+              `Insufficient stock for "${product.name}": ${product.quantity} available, ${quantity} requested`,
+            );
+            err.status = 400;
+            err.code = 'insufficient_stock';
+            throw err;
+          }
+          products.adjustQuantity(product.id, -quantity);
+        }
       }
     }
 

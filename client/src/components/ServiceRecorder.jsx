@@ -4,12 +4,10 @@ import {
   Group,
   Button,
   Text,
-  SimpleGrid,
   Card,
   Modal,
   NumberInput,
   Box,
-  Divider,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -121,67 +119,47 @@ export default function ServiceRecorder() {
 
   return (
     <>
-      <Stack gap="xl">
-        {services.map((svc) => {
+      <Group gap="sm" wrap="wrap">
+        {services.flatMap((svc) => {
           const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
-
-          return (
-            <Box key={svc.id}>
-              <Text fw={600} size="lg" mb="sm">
+          return [
+            <Card
+              key={`plain-${svc.id}`}
+              withBorder
+              radius="md"
+              p={0}
+              style={{ cursor: 'pointer', borderLeft: '4px solid var(--mantine-color-gray-4)' }}
+              onClick={() => openRecord(svc, null)}
+            >
+              <Button variant="subtle" color="gray" styles={{ root: { pointerEvents: 'none' } }} size="sm">
                 {serviceName(svc)}
-              </Text>
-              <Divider mb="sm" />
-              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
-                {svcShortcuts.map((sc) => (
-                  <Card
-                    key={sc.id}
-                    withBorder
-                    radius="md"
-                    padding="md"
-                    style={{
-                      cursor: 'pointer',
-                      borderLeft: `4px solid var(--mantine-color-${sc.color || 'gray'}-5)`,
-                      transition: 'box-shadow 0.15s',
-                    }}
-                    onClick={() => openRecord(svc, sc)}
-                  >
-                    <Button
-                      variant="light"
-                      color={sc.color || 'gray'}
-                      fullWidth
-                      styles={{ root: { pointerEvents: 'none' } }}
-                      size="sm"
-                    >
-                      {shortcutLabel(sc)}
-                    </Button>
-                  </Card>
-                ))}
-
-                <Card
-                  withBorder
-                  radius="md"
-                  padding="md"
-                  style={{
-                    cursor: 'pointer',
-                    borderLeft: '4px solid var(--mantine-color-gray-4)',
-                  }}
-                  onClick={() => openRecord(svc, null)}
+              </Button>
+            </Card>,
+            ...svcShortcuts.map((sc) => (
+              <Card
+                key={sc.id}
+                withBorder
+                radius="md"
+                p={0}
+                style={{
+                  cursor: 'pointer',
+                  borderLeft: `4px solid var(--mantine-color-${sc.color || 'gray'}-5)`,
+                }}
+                onClick={() => openRecord(svc, sc)}
+              >
+                <Button
+                  variant="light"
+                  color={sc.color || 'gray'}
+                  styles={{ root: { pointerEvents: 'none' } }}
+                  size="sm"
                 >
-                  <Button
-                    variant="subtle"
-                    color="gray"
-                    fullWidth
-                    styles={{ root: { pointerEvents: 'none' } }}
-                    size="sm"
-                  >
-                    {t('services.recordWithoutShortcut')}
-                  </Button>
-                </Card>
-              </SimpleGrid>
-            </Box>
-          );
+                  {shortcutLabel(sc)}
+                </Button>
+              </Card>
+            )),
+          ];
         })}
-      </Stack>
+      </Group>
 
       {/* Record modal */}
       <Modal
