@@ -196,12 +196,20 @@
     "filterType": "النوع",
     "date": "التاريخ",
     "items": "العناصر",
+    "itemCount": "#",
     "total": "الإجمالي",
     "profit": "الربح",
     "note": "ملاحظة",
     "details": "تفاصيل المعاملة",
     "from": "من",
-    "to": "إلى"
+    "to": "إلى",
+    "user": "المستخدم",
+    "filterUser": "المستخدم",
+    "quickToday": "اليوم",
+    "quickWeek": "هذا الأسبوع",
+    "quickMonth": "هذا الشهر",
+    "quickYear": "هذه السنة",
+    "clearFilters": "مسح"
   },
   "services": {
     "title": "الخدمات",

@@ -196,12 +196,20 @@
     "filterType": "Type",
     "date": "Date",
     "items": "Items",
+    "itemCount": "#",
     "total": "Total",
     "profit": "Profit",
     "note": "Note",
     "details": "Transaction Details",
     "from": "From",
-    "to": "To"
+    "to": "To",
+    "user": "User",
+    "filterUser": "User",
+    "quickToday": "Today",
+    "quickWeek": "This Week",
+    "quickMonth": "This Month",
+    "quickYear": "This Year",
+    "clearFilters": "Clear"
   },
   "services": {
     "title": "Services",
