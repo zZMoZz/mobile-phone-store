@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   cost_total      REAL NOT NULL DEFAULT 0,     -- total cost of goods involved
   total           REAL NOT NULL DEFAULT 0,     -- amount charged/paid
   profit          REAL NOT NULL DEFAULT 0,     -- total - cost_total (sale/service)
+  user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  username_snapshot TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

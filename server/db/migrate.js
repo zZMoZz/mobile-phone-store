@@ -52,6 +52,12 @@ function applyColumnMigrations(db) {
   if (!txnCols.includes('service_data')) {
     db.exec('ALTER TABLE transactions ADD COLUMN service_data TEXT');
   }
+  if (!txnCols.includes('user_id')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
+  }
+  if (!txnCols.includes('username_snapshot')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN username_snapshot TEXT');
+  }
 
   // Users: full table recreation to add new columns and update role CHECK constraint.
   // Triggered by the absence of token_version (added in the auth overhaul).
