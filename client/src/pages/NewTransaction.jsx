@@ -436,6 +436,7 @@ export default function NewTransaction() {
           }}
         >
           <Group justify="space-between">
+            <Text fw={700} size="sm">{t('txns.title')}</Text>
             <Group gap="xs">
               {['today', 'week', 'month', 'year'].map((preset) => (
                 <Button
@@ -448,7 +449,6 @@ export default function NewTransaction() {
                 </Button>
               ))}
             </Group>
-            <Text fw={600} size="sm">{t('txns.title')}</Text>
           </Group>
         </Box>
 
@@ -505,7 +505,7 @@ export default function NewTransaction() {
         {/* Table */}
         <ScrollArea>
           <Table highlightOnHover verticalSpacing="xs" fz="xs" miw={760}>
-            <Table.Thead>
+            <Table.Thead style={{ backgroundColor: colorScheme === 'dark' ? 'var(--mantine-color-dark-5)' : 'var(--mantine-color-gray-2)' }}>
               <Table.Tr>
                 <Table.Th>{t('txns.date')}</Table.Th>
                 <Table.Th>{t('newTxn.type')}</Table.Th>
