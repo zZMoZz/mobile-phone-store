@@ -170,6 +170,9 @@
     "type": "Type",
     "scanToAdd": "Scan barcode or type product name, then Enter",
     "manualAdd": "Add Unlisted Item",
+    "loadFromSale": "Load from Sale",
+    "selectSale": "Select Sale Transaction",
+    "saleLoaded": "Sale items loaded — review and adjust before recording",
     "cart": "Items",
     "empty": "No items yet. Scan a barcode to add.",
     "barcode": "Barcode",
@@ -194,7 +197,7 @@
     "newItemName": "New item name",
     "buyingPrice": "Buying price",
     "remove": "Remove",
-    "refundPerUnit": "Refund / Unit",
+    "refundPerUnit": "Refund",
     "refundTotal": "Refund Total"
   },
   "txns": {

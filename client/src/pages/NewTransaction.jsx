@@ -24,7 +24,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconTrash, IconPlus, IconDeviceFloppy } from '@tabler/icons-react';
+import { IconTrash, IconPlus, IconDeviceFloppy, IconSearch } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import ProductSearchInput from '../components/ProductSearchInput.jsx';
 import { lookupByBarcode, searchProducts } from '../api/products.js';
@@ -125,8 +125,15 @@ export default function NewTransaction() {
   const [searchResults, setSearchResults] = useState([]);
   const [pickerOpened, pickerHandlers] = useDisclosure(false);
 
+  const [salePickerOpened, salePickerHandlers] = useDisclosure(false);
+  const [salePickerData, setSalePickerData] = useState({ items: [], total: 0 });
+  const [saleFrom, setSaleFrom] = useState('');
+  const [saleTo, setSaleTo] = useState('');
+  const [salePage, setSalePage] = useState(1);
+  const [saleQuick, setSaleQuick] = useState(null);
+
   const barcodeRef = useRef(null);
-  const anyModalOpen = opened || pickerOpened;
+  const anyModalOpen = opened || pickerOpened || salePickerOpened;
   const anyModalOpenRef = useRef(anyModalOpen);
   anyModalOpenRef.current = anyModalOpen;
   const detailPending = useRef(false);
@@ -197,6 +204,41 @@ export default function NewTransaction() {
     setFrom('');
     setTo('');
     setQuickPeriod(null);
+  };
+
+  useEffect(() => {
+    if (!salePickerOpened) return;
+    listTransactions({
+      type: 'sale',
+      from: saleFrom || undefined,
+      to: saleTo ? `${saleTo} 23:59:59` : undefined,
+      page: salePage,
+      pageSize: 10,
+    }).then(setSalePickerData).catch(() => {});
+  }, [salePickerOpened, saleFrom, saleTo, salePage]);
+
+  useEffect(() => { setSalePage(1); }, [saleFrom, saleTo]);
+
+  const loadFromSale = async (id) => {
+    try {
+      const txn = await getTransaction(id);
+      const newLines = txn.items.map((item) => ({
+        key: nextKey(),
+        product_id: item.product_id || null,
+        name: item.name_snapshot,
+        barcode: item.barcode || null,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        unit_cost: item.unit_cost,
+        stock: item.current_stock ?? null,
+        locked: true,
+      }));
+      setLines(newLines);
+      salePickerHandlers.close();
+      notifications.show({ message: t('newTxn.saleLoaded'), color: 'green' });
+    } catch {
+      notifications.show({ message: t('common.error'), color: 'red' });
+    }
   };
 
   const openDetail = async (id) => {
@@ -281,8 +323,7 @@ export default function NewTransaction() {
       if (!l.product_id && type === 'sale' && !(Number(l.unit_cost) > 0)) return false;
       if (type === 'sale' && l.stock != null && Number(l.quantity) > l.stock) return false;
       return true;
-    }) &&
-    (type !== 'return' || lines.every((l) => l.product_id != null));
+    });
 
   const submit = async () => {
     setSaving(true);
@@ -355,6 +396,11 @@ export default function NewTransaction() {
               {t('newTxn.manualAdd')}
             </Button>
           )}
+          {type === 'return' && (
+            <Button variant="light" color="orange" leftSection={<IconSearch size={16} />} onClick={salePickerHandlers.open}>
+              {t('newTxn.loadFromSale')}
+            </Button>
+          )}
         </Group>
 
         <Table verticalSpacing="xs">
@@ -374,7 +420,7 @@ export default function NewTransaction() {
             {lines.map((l) => (
               <Table.Tr key={l.key}>
                 <Table.Td>
-                  {l.product_id ? (
+                  {(l.product_id || l.locked) ? (
                     <Text fw={500}>{l.name}</Text>
                   ) : (
                     <Stack gap={4}>
@@ -695,6 +741,78 @@ export default function NewTransaction() {
             {detail.note && <Text c="dimmed">{detail.note}</Text>}
           </Stack>
         )}
+      </Modal>
+
+      {/* Sale-picker modal for returns */}
+      <Modal opened={salePickerOpened} onClose={salePickerHandlers.close} title={t('newTxn.selectSale')} size="lg">
+        <Stack mb="sm" gap="xs">
+          <Group gap="xs" align="center">
+            <Text size="xs" fw={500}>{t('txns.date')}</Text>
+            <TextInput size="xs" type="date"
+              value={saleFrom && saleFrom === saleTo ? saleFrom : ''}
+              onChange={(e) => { const d = e.currentTarget.value; setSaleFrom(d); setSaleTo(d); setSaleQuick(null); }}
+              w={140} />
+            <Text size="xs" fw={500}>{t('txns.from')}</Text>
+            <TextInput size="xs" type="date" value={saleFrom}
+              onChange={(e) => { setSaleFrom(e.currentTarget.value); setSaleQuick(null); }} w={140} />
+            <Text size="xs" fw={500}>{t('txns.to')}</Text>
+            <TextInput size="xs" type="date" value={saleTo}
+              onChange={(e) => { setSaleTo(e.currentTarget.value); setSaleQuick(null); }} w={140} />
+          </Group>
+          <Group gap="xs">
+            {['today', 'week', 'month'].map((p) => (
+              <Button key={p} size="xs"
+                variant={saleQuick === p ? 'filled' : 'default'}
+                onClick={() => {
+                  const { from: f, to: tt } = quickRange(p);
+                  setSaleFrom(f); setSaleTo(tt); setSaleQuick(p);
+                }}>
+                {t(`txns.quick${p.charAt(0).toUpperCase()}${p.slice(1)}`)}
+              </Button>
+            ))}
+            <Button size="xs" variant="default"
+              onClick={() => { setSaleFrom(''); setSaleTo(''); setSaleQuick(null); }}>
+              {t('txns.clearFilters')}
+            </Button>
+          </Group>
+        </Stack>
+
+        <Table highlightOnHover verticalSpacing="xs" fz="sm">
+          <Table.Thead>
+            <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
+              <Table.Th>{t('txns.date')}</Table.Th>
+              <Table.Th>{t('txns.items')}</Table.Th>
+              <Table.Th>{t('txns.total')}</Table.Th>
+              <Table.Th>{t('txns.user')}</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {salePickerData.items.map((txn) => (
+              <Table.Tr key={txn.id} style={{ cursor: 'pointer' }} onClick={() => loadFromSale(txn.id)}>
+                <Table.Td>{formatDate(txn.created_at, lang)}</Table.Td>
+                <Table.Td><Text size="xs" lineClamp={1}>{itemSummary(txn.items)}</Text></Table.Td>
+                <Table.Td>{formatMoney(txn.total, lang)}</Table.Td>
+                <Table.Td><Text size="xs" c="dimmed">{txn.username_snapshot || '—'}</Text></Table.Td>
+              </Table.Tr>
+            ))}
+            {salePickerData.items.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={4}>
+                  <Center p="md"><Text c="dimmed">{t('common.noResults')}</Text></Center>
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+
+        <Group justify="flex-end" mt="sm">
+          <Pagination
+            total={Math.max(1, Math.ceil(salePickerData.total / 10))}
+            value={salePage}
+            onChange={setSalePage}
+            size="sm"
+          />
+        </Group>
       </Modal>
     </Stack>
   );

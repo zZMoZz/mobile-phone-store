@@ -20,7 +20,12 @@ export function getById(id) {
   const txn = getDb().prepare('SELECT * FROM transactions WHERE id = ?').get(id);
   if (!txn) return undefined;
   const items = getDb()
-    .prepare('SELECT * FROM transaction_items WHERE transaction_id = ? ORDER BY id')
+    .prepare(
+      `SELECT ti.*, p.barcode, p.quantity AS current_stock
+       FROM transaction_items ti
+       LEFT JOIN products p ON p.id = ti.product_id
+       WHERE ti.transaction_id = ? ORDER BY ti.id`,
+    )
     .all(id);
   let serviceType = null;
   if (txn.service_type_id) {
