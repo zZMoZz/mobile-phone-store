@@ -163,7 +163,19 @@
     "purchase": "شراء",
     "sale": "بيع",
     "service": "الخدمة",
-    "return": "مرتجع"
+    "return": "مرتجع",
+    "expense": "مصروف"
+  },
+  "expense": {
+    "record": "مصروف",
+    "recordTitle": "تسجيل مصروف",
+    "label": "البيان",
+    "labelPlaceholder": "مثال: إيجار المحل",
+    "amount": "المبلغ",
+    "note": "ملاحظة",
+    "recorded": "تم تسجيل المصروف",
+    "labelRequired": "من فضلك أدخل بيان المصروف",
+    "amountRequired": "يجب أن يكون المبلغ أكبر من 0"
   },
   "newTxn": {
     "title": "إدارة المعاملات",
@@ -324,6 +336,7 @@
     "purchasesTotal": "إجمالى المشتريات",
     "txnCount": "المعاملات",
     "servicesTotal": "إيراد الخدمات",
+    "expensesTotal": "إجمالى المصروفات",
     "salesTrend": "تطور المبيعات والأرباح",
     "lowStock": "المنتجات المنخفضة فى المخزن",
     "lowStockEmpty": "لا توجد منتجات منخفضة المخزون",

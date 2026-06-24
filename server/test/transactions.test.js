@@ -131,6 +131,45 @@ describe('transactions API', () => {
     expect(res.status).toBe(400);
   });
 
+  it('records a productless expense (no profit, no stock change)', async () => {
+    const before = await api.get('/api/products').then((r) => r.body);
+    const res = await api
+      .post('/api/transactions')
+      .send({ type: 'expense', label: 'Shop rent', amount: 5000, note: 'June' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('expense');
+    expect(res.body.total).toBe(5000);
+    expect(res.body.profit).toBe(0);
+    expect(res.body.cost_total).toBe(0);
+    expect(res.body.items).toEqual([]);
+    expect(res.body.service_data.label).toBe('Shop rent');
+    expect(res.body.note).toBe('June');
+
+    // No products were created or touched by an expense.
+    const after = await api.get('/api/products').then((r) => r.body);
+    expect(after.total).toBe(before.total);
+  });
+
+  it('rejects an expense with non-positive amount', async () => {
+    const res = await api
+      .post('/api/transactions')
+      .send({ type: 'expense', label: 'Bad', amount: 0 });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an expense with an empty label', async () => {
+    const res = await api
+      .post('/api/transactions')
+      .send({ type: 'expense', label: '   ', amount: 100 });
+    expect(res.status).toBe(400);
+  });
+
+  it('filters transactions by expense type', async () => {
+    const list = await api.get('/api/transactions').query({ type: 'expense' });
+    expect(list.body.items.length).toBeGreaterThan(0);
+    expect(list.body.items.every((t) => t.type === 'expense')).toBe(true);
+  });
+
   it('product history reflects recorded transactions', async () => {
     const p = await createProduct({ name: 'Tracked', buying_price: 10, selling_price: 20, quantity: 5 });
     await api.post('/api/transactions').send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] });

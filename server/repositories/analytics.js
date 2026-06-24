@@ -30,7 +30,7 @@ export function overview(query = {}) {
     )
     .all(params);
 
-  const totals = { sales: 0, profit: 0, purchases: 0, services: 0, count: 0 };
+  const totals = { sales: 0, profit: 0, purchases: 0, services: 0, expenses: 0, count: 0 };
   for (const r of totalsRows) {
     totals.count += r.count;
     if (r.type === 'sale') {
@@ -40,6 +40,8 @@ export function overview(query = {}) {
       totals.purchases += r.total;
     } else if (r.type === 'service') {
       totals.services += r.total;
+    } else if (r.type === 'expense') {
+      totals.expenses += r.total;
     }
   }
 

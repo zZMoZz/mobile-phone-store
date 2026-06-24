@@ -168,6 +168,43 @@ function createServiceTransaction(payload, user) {
   return getById(info.lastInsertRowid);
 }
 
+// Builds + inserts an expense transaction: a money-out event that isn't inventory
+// (e.g. shop rent). Productless — no line items, no stock change, no profit.
+// `payload.amount` is what was paid (stored as `total`); `payload.label` is what it
+// was for (stored in `service_data` as JSON so reports can group/display it).
+function createExpenseTransaction(payload, user) {
+  const total = round2(payload.amount);
+  if (!(total > 0)) {
+    const err = new Error('Amount must be greater than 0');
+    err.status = 400;
+    err.code = 'expense_amount_positive';
+    throw err;
+  }
+  const label = payload.label ? String(payload.label).trim() : '';
+  if (!label) {
+    const err = new Error('Label is required');
+    err.status = 400;
+    err.code = 'expense_label_required';
+    throw err;
+  }
+
+  const db = getDb();
+  const info = db
+    .prepare(
+      `INSERT INTO transactions
+         (type, service_data, note, subtotal, fee, cost_total, total, profit, user_id, username_snapshot)
+       VALUES ('expense', @service_data, @note, 0, 0, 0, @total, 0, @user_id, @username_snapshot)`,
+    )
+    .run({
+      service_data: JSON.stringify({ label }),
+      note: payload.note || null,
+      total,
+      user_id: user?.id ?? null,
+      username_snapshot: user?.username ?? null,
+    });
+  return getById(info.lastInsertRowid);
+}
+
 /**
  * Records a transaction atomically: inserts the transaction + line items,
  * adjusts product stock, and computes totals/profit.
@@ -180,12 +217,13 @@ function createServiceTransaction(payload, user) {
  */
 export function create(payload, user) {
   const type = payload.type;
-  if (!['purchase', 'sale', 'service', 'return'].includes(type)) {
+  if (!['purchase', 'sale', 'service', 'return', 'expense'].includes(type)) {
     const err = new Error('Invalid transaction type');
     err.status = 400;
     throw err;
   }
   if (type === 'service') return createServiceTransaction(payload, user);
+  if (type === 'expense') return createExpenseTransaction(payload, user);
   const rawItems = Array.isArray(payload.items) ? payload.items : [];
   const fee = type === 'service' ? round2(payload.fee) : 0;
 

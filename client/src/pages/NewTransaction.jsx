@@ -32,6 +32,7 @@ import { listTransactions, getTransaction, createTransaction } from '../api/tran
 import { listUsers } from '../api/users.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
 import ServiceRecorder from '../components/ServiceRecorder.jsx';
+import ExpenseRecorder from '../components/ExpenseRecorder.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 20;
@@ -40,8 +41,18 @@ const typeColor = (type) => {
   if (type === 'sale') return 'blue';
   if (type === 'purchase') return 'teal';
   if (type === 'return') return 'orange';
+  if (type === 'expense') return 'red';
   return 'grape';
 };
+
+// Reads an expense row's label out of its service_data JSON (string in list rows,
+// already-parsed object in detail rows).
+function expenseLabel(txn) {
+  const data = typeof txn.service_data === 'string'
+    ? (() => { try { return JSON.parse(txn.service_data); } catch { return null; } })()
+    : txn.service_data;
+  return data?.label || '';
+}
 
 const nextKey = () => `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -367,6 +378,8 @@ export default function NewTransaction() {
 
       <ServiceRecorder />
 
+      <ExpenseRecorder />
+
       <Paper withBorder p="md" radius="md">
         <SegmentedControl
           fullWidth
@@ -376,7 +389,6 @@ export default function NewTransaction() {
           }}
           data={[
             { value: 'sale', label: t('txnType.sale') },
-            { value: 'purchase', label: t('txnType.purchase') },
             { value: 'return', label: t('txnType.return') },
           ]}
         />
@@ -563,6 +575,7 @@ export default function NewTransaction() {
               { value: 'purchase', label: t('txnType.purchase') },
               { value: 'service', label: t('txnType.service') },
               { value: 'return', label: t('txnType.return') },
+              { value: 'expense', label: t('txnType.expense') },
             ]}
             value={filterType}
             onChange={setFilterType}
@@ -632,14 +645,16 @@ export default function NewTransaction() {
                     </Badge>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" lineClamp={1}>{itemSummary(txn.items)}</Text>
+                    <Text size="xs" lineClamp={1}>
+                      {txn.type === 'expense' ? (expenseLabel(txn) || '—') : itemSummary(txn.items)}
+                    </Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs">{formatNumber(txn.items?.length ?? 0, lang)}</Text>
                   </Table.Td>
                   <Table.Td>{formatMoney(txn.total, lang)}</Table.Td>
                   <Table.Td>
-                    {(txn.type === 'purchase' || txn.type === 'return') ? '—' : formatMoney(txn.profit, lang)}
+                    {(txn.type === 'purchase' || txn.type === 'return' || txn.type === 'expense') ? '—' : formatMoney(txn.profit, lang)}
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c="dimmed">{txn.username_snapshot || '—'}</Text>
@@ -700,26 +715,30 @@ export default function NewTransaction() {
                 <Text size="sm" c="dimmed">{detail.username_snapshot}</Text>
               )}
             </Group>
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('newTxn.item')}</Table.Th>
-                  <Table.Th>{t('newTxn.quantity')}</Table.Th>
-                  <Table.Th>{t('newTxn.unitPrice')}</Table.Th>
-                  <Table.Th>{t('newTxn.lineTotal')}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {detail.items.map((it) => (
-                  <Table.Tr key={it.id}>
-                    <Table.Td>{it.name_snapshot}</Table.Td>
-                    <Table.Td>{formatNumber(it.quantity, lang)}</Table.Td>
-                    <Table.Td>{formatMoney(it.unit_price, lang)}</Table.Td>
-                    <Table.Td>{formatMoney(it.line_total, lang)}</Table.Td>
+            {detail.type === 'expense' ? (
+              <Text fw={600}>{expenseLabel(detail) || '—'}</Text>
+            ) : (
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('newTxn.item')}</Table.Th>
+                    <Table.Th>{t('newTxn.quantity')}</Table.Th>
+                    <Table.Th>{t('newTxn.unitPrice')}</Table.Th>
+                    <Table.Th>{t('newTxn.lineTotal')}</Table.Th>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+                </Table.Thead>
+                <Table.Tbody>
+                  {detail.items.map((it) => (
+                    <Table.Tr key={it.id}>
+                      <Table.Td>{it.name_snapshot}</Table.Td>
+                      <Table.Td>{formatNumber(it.quantity, lang)}</Table.Td>
+                      <Table.Td>{formatMoney(it.unit_price, lang)}</Table.Td>
+                      <Table.Td>{formatMoney(it.line_total, lang)}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
             <Divider />
             <Group justify="space-between">
               <Stack gap={2}>
@@ -732,7 +751,7 @@ export default function NewTransaction() {
                   {t('newTxn.total')}: {formatMoney(detail.total, lang)}
                 </Text>
               </Stack>
-              {detail.type !== 'purchase' && detail.type !== 'return' && (
+              {detail.type !== 'purchase' && detail.type !== 'return' && detail.type !== 'expense' && (
                 <Badge color="teal" variant="light" size="lg">
                   {t('newTxn.profit')}: {formatMoney(detail.profit, lang)}
                 </Badge>

@@ -163,7 +163,19 @@
     "purchase": "Purchase",
     "sale": "Sale",
     "service": "Service",
-    "return": "Return"
+    "return": "Return",
+    "expense": "Expense"
+  },
+  "expense": {
+    "record": "Expense",
+    "recordTitle": "Record Expense",
+    "label": "What for",
+    "labelPlaceholder": "e.g. Shop rent",
+    "amount": "Amount",
+    "note": "Note",
+    "recorded": "Expense recorded",
+    "labelRequired": "Please enter what the expense was for",
+    "amountRequired": "Amount must be greater than 0"
   },
   "newTxn": {
     "title": "Manage Transactions",
@@ -324,6 +336,7 @@
     "purchasesTotal": "Total Purchases",
     "txnCount": "Transactions",
     "servicesTotal": "Service Revenue",
+    "expensesTotal": "Total Expenses",
     "salesTrend": "Sales & Profit Trend",
     "lowStock": "Low Stock",
     "lowStockEmpty": "No low-stock products",
