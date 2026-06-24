@@ -5,6 +5,7 @@ import {
   Group,
   SegmentedControl,
   Paper,
+  Box,
   Table,
   NumberInput,
   TextInput,
@@ -19,6 +20,7 @@ import {
   Pagination,
   Modal,
   ScrollArea,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -27,20 +29,52 @@ import { useTranslation } from 'react-i18next';
 import ProductSearchInput from '../components/ProductSearchInput.jsx';
 import { lookupByBarcode, searchProducts } from '../api/products.js';
 import { listTransactions, getTransaction, createTransaction } from '../api/transactions.js';
+import { listUsers } from '../api/users.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
 import ServiceRecorder from '../components/ServiceRecorder.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 20;
+const MAX_SHOWN = 2;
 const typeColor = (type) => (type === 'sale' ? 'blue' : type === 'purchase' ? 'teal' : 'grape');
 
 let lineCounter = 0;
 const nextKey = () => `line-${lineCounter++}`;
 
+function itemSummary(items = []) {
+  const names = items.map((i) => i.name_snapshot);
+  if (names.length === 0) return '—';
+  if (names.length <= MAX_SHOWN) return names.join(', ');
+  return `${names.slice(0, MAX_SHOWN).join(', ')} +${names.length - MAX_SHOWN}`;
+}
+
+function quickRange(preset) {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (preset === 'today') return { from: today, to: today };
+  if (preset === 'week') {
+    // Week starts on Saturday (getDay: 0=Sun, 6=Sat)
+    const daysSinceSat = (now.getDay() + 1) % 7;
+    const sat = new Date(now);
+    sat.setDate(now.getDate() - daysSinceSat);
+    return { from: sat.toISOString().slice(0, 10), to: today };
+  }
+  if (preset === 'month') {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from: first.toISOString().slice(0, 10), to: today };
+  }
+  if (preset === 'year') {
+    const first = new Date(now.getFullYear(), 0, 1);
+    return { from: first.toISOString().slice(0, 10), to: today };
+  }
+  return { from: '', to: '' };
+}
+
 export default function NewTransaction() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { isAdmin } = useAuth();
+  const { colorScheme } = useMantineColorScheme();
 
   // --- New transaction form ---
   const [type, setType] = useState('sale');
@@ -50,11 +84,14 @@ export default function NewTransaction() {
 
   // --- Transaction history ---
   const [filterType, setFilterType] = useState(null);
+  const [filterUser, setFilterUser] = useState(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [quickPeriod, setQuickPeriod] = useState(null);
   const [page, setPage] = useState(1);
   const [historyData, setHistoryData] = useState({ items: [], total: 0 });
   const [refresh, setRefresh] = useState(0);
+  const [users, setUsers] = useState([]);
 
   const [detail, setDetail] = useState(null);
   const [opened, handlers] = useDisclosure(false);
@@ -62,15 +99,10 @@ export default function NewTransaction() {
   const [searchResults, setSearchResults] = useState([]);
   const [pickerOpened, pickerHandlers] = useDisclosure(false);
 
-  // Keep barcode input focused whenever nothing else has focus (scanner-first).
   const barcodeRef = useRef(null);
-  // Combined ref so the focusout closure always sees the latest modal state
-  // without re-registering the listener on every open/close toggle.
   const anyModalOpen = opened || pickerOpened;
   const anyModalOpenRef = useRef(anyModalOpen);
   anyModalOpenRef.current = anyModalOpen;
-  // True while a detail fetch is in-flight — openDetail is async so the modal
-  // isn't open yet when focusout fires; this prevents the premature refocus.
   const detailPending = useRef(false);
 
   useEffect(() => {
@@ -79,8 +111,6 @@ export default function NewTransaction() {
 
   useEffect(() => {
     const refocusIfIdle = () => {
-      // 50 ms lets React flush the state update triggered by a row click
-      // before we check whether a modal just opened.
       setTimeout(() => {
         if (anyModalOpenRef.current || detailPending.current) return;
         const active = document.activeElement;
@@ -101,15 +131,23 @@ export default function NewTransaction() {
     prevModalOpen.current = anyModalOpen;
   }, [anyModalOpen]);
 
+  // Load users list for the username filter (admin only)
+  useEffect(() => {
+    if (isAdmin) {
+      listUsers().then(setUsers).catch(() => {});
+    }
+  }, [isAdmin]);
+
   const historyQuery = useMemo(
     () => ({
       type: filterType || undefined,
+      username: filterUser || undefined,
       from: from || undefined,
       to: to ? `${to} 23:59:59` : undefined,
       page,
       pageSize: PAGE_SIZE,
     }),
-    [filterType, from, to, page],
+    [filterType, filterUser, from, to, page],
   );
 
   useEffect(() => {
@@ -118,7 +156,22 @@ export default function NewTransaction() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterType, from, to]);
+  }, [filterType, filterUser, from, to]);
+
+  const applyQuickPeriod = (preset) => {
+    const { from: f, to: tt } = quickRange(preset);
+    setFrom(f);
+    setTo(tt);
+    setQuickPeriod(preset);
+  };
+
+  const clearFilters = () => {
+    setFilterType(null);
+    setFilterUser(null);
+    setFrom('');
+    setTo('');
+    setQuickPeriod(null);
+  };
 
   const openDetail = async (id) => {
     try {
@@ -230,6 +283,14 @@ export default function NewTransaction() {
     }
   };
 
+  const headerBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-1)';
+  const headerBorder = colorScheme === 'dark' ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)';
+
+  const userSelectData = users.map((u) => ({
+    value: u.username,
+    label: u.display_name ? `${u.display_name} (${u.username})` : u.username,
+  }));
+
   return (
     <Stack>
       <Title order={2}>{t('newTxn.title')}</Title>
@@ -249,126 +310,153 @@ export default function NewTransaction() {
       />
 
       <Paper withBorder p="md" radius="md">
-            <Group align="flex-end" mb="sm">
-              <ProductSearchInput
-                ref={barcodeRef}
-                onScan={handleScan}
-                onProductSelect={addProductLine}
-                placeholder={t('newTxn.scanToAdd')}
-                style={{ flex: 1 }}
-              />
-              <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
-                {t('newTxn.manualAdd')}
-              </Button>
-            </Group>
+        <Group align="flex-end" mb="sm">
+          <ProductSearchInput
+            ref={barcodeRef}
+            onScan={handleScan}
+            onProductSelect={addProductLine}
+            placeholder={t('newTxn.scanToAdd')}
+            style={{ flex: 1 }}
+          />
+          <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
+            {t('newTxn.manualAdd')}
+          </Button>
+        </Group>
 
-            <Table verticalSpacing="xs">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('newTxn.item')}</Table.Th>
-                  <Table.Th w={90}>{t('newTxn.quantity')}</Table.Th>
-                  <Table.Th w={130}>{t('newTxn.unitPrice')}</Table.Th>
-                  <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
-                  <Table.Th w={48} />
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {lines.map((l) => (
-                  <Table.Tr key={l.key}>
-                    <Table.Td>
-                      {l.product_id ? (
-                        <Stack gap={2}>
-                          <Group gap={6}>
-                            <Text fw={500}>{l.name}</Text>
-                            {l.barcode && <Text size="xs" c="dimmed">{l.barcode}</Text>}
-                          </Group>
-                          {type === 'sale' && l.stock != null && (
-                            <Text size="xs" c={Number(l.quantity) > l.stock ? 'red' : 'dimmed'}>
-                              {t('newTxn.inStock')}: {formatNumber(l.stock, lang)}
-                            </Text>
-                          )}
-                        </Stack>
-                      ) : (
-                        <TextInput
-                          placeholder={t('newTxn.newItemName')}
-                          value={l.name}
-                          onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
-                        />
+        <Table verticalSpacing="xs">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>{t('newTxn.item')}</Table.Th>
+              <Table.Th w={90}>{t('newTxn.quantity')}</Table.Th>
+              <Table.Th w={130}>{t('newTxn.unitPrice')}</Table.Th>
+              <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
+              <Table.Th w={48} />
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {lines.map((l) => (
+              <Table.Tr key={l.key}>
+                <Table.Td>
+                  {l.product_id ? (
+                    <Stack gap={2}>
+                      <Group gap={6}>
+                        <Text fw={500}>{l.name}</Text>
+                        {l.barcode && <Text size="xs" c="dimmed">{l.barcode}</Text>}
+                      </Group>
+                      {type === 'sale' && l.stock != null && (
+                        <Text size="xs" c={Number(l.quantity) > l.stock ? 'red' : 'dimmed'}>
+                          {t('newTxn.inStock')}: {formatNumber(l.stock, lang)}
+                        </Text>
                       )}
-                    </Table.Td>
-                    <Table.Td>
-                      <NumberInput
-                        min={1}
-                        value={l.quantity}
-                        onChange={(v) => updateLine(l.key, { quantity: v })}
-                        hideControls
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <NumberInput
-                        min={0}
-                        value={l.unit_price}
-                        onChange={(v) => updateLine(l.key, { unit_price: v })}
-                        hideControls
-                      />
-                    </Table.Td>
-                    <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>
-                    <Table.Td>
-                      <ActionIcon variant="subtle" color="red" onClick={() => removeLine(l.key)}>
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-                {lines.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td colSpan={6}>
-                      <Center p="md">
-                        <Text c="dimmed">{t('newTxn.empty')}</Text>
-                      </Center>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
-
-          <Paper withBorder p="md" radius="md">
-            <Textarea label={t('newTxn.note')} value={note} onChange={(e) => setNote(e.currentTarget.value)} mb="md" autosize minRows={1} />
-            <Divider mb="sm" />
-            <Group justify="space-between">
-              <Stack gap={2}>
-                <Text size="sm" c="dimmed">
-                  {t('newTxn.subtotal')}: {formatMoney(totals.subtotal, lang)}
-                </Text>
-                <Text fw={700}>
-                  {t('newTxn.total')}: {formatMoney(totals.total, lang)}
-                </Text>
-                {type !== 'purchase' && (
-                  <Badge color="teal" variant="light">
-                    {t('newTxn.profit')}: {formatMoney(totals.profit, lang)}
-                  </Badge>
-                )}
-              </Stack>
-              <Button
-                size="md"
-                leftSection={<IconDeviceFloppy size={18} />}
-                disabled={!canSubmit}
-                loading={saving}
-                onClick={submit}
-              >
-                {t('newTxn.record')}
-              </Button>
-            </Group>
-          </Paper>
-
-      {/* Transaction history */}
-      <Divider mt="md" />
-      <Title order={3}>{t('txns.title')}</Title>
+                    </Stack>
+                  ) : (
+                    <TextInput
+                      placeholder={t('newTxn.newItemName')}
+                      value={l.name}
+                      onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
+                    />
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  <NumberInput
+                    min={1}
+                    value={l.quantity}
+                    onChange={(v) => updateLine(l.key, { quantity: v })}
+                    hideControls
+                  />
+                </Table.Td>
+                <Table.Td>
+                  <NumberInput
+                    min={0}
+                    value={l.unit_price}
+                    onChange={(v) => updateLine(l.key, { unit_price: v })}
+                    hideControls
+                  />
+                </Table.Td>
+                <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>
+                <Table.Td>
+                  <ActionIcon variant="subtle" color="red" onClick={() => removeLine(l.key)}>
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+            {lines.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={6}>
+                  <Center p="md">
+                    <Text c="dimmed">{t('newTxn.empty')}</Text>
+                  </Center>
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      </Paper>
 
       <Paper withBorder p="md" radius="md">
-        <Group grow align="flex-end">
+        <Textarea label={t('newTxn.note')} value={note} onChange={(e) => setNote(e.currentTarget.value)} mb="md" autosize minRows={1} />
+        <Divider mb="sm" />
+        <Group justify="space-between">
+          <Stack gap={2}>
+            <Text size="sm" c="dimmed">
+              {t('newTxn.subtotal')}: {formatMoney(totals.subtotal, lang)}
+            </Text>
+            <Text fw={700}>
+              {t('newTxn.total')}: {formatMoney(totals.total, lang)}
+            </Text>
+            {type !== 'purchase' && (
+              <Badge color="teal" variant="light">
+                {t('newTxn.profit')}: {formatMoney(totals.profit, lang)}
+              </Badge>
+            )}
+          </Stack>
+          <Button
+            size="md"
+            leftSection={<IconDeviceFloppy size={18} />}
+            disabled={!canSubmit}
+            loading={saving}
+            onClick={submit}
+          >
+            {t('newTxn.record')}
+          </Button>
+        </Group>
+      </Paper>
+
+      {/* ── Transaction history ─────────────────────────────── */}
+      <Divider mt="md" />
+      <Paper withBorder radius="md" p={0}>
+        {/* Header bar: title + quick period buttons */}
+        <Box
+          px="md"
+          py="xs"
+          style={{
+            backgroundColor: headerBg,
+            borderBottom: `1px solid ${headerBorder}`,
+            borderRadius: 'var(--mantine-radius-md) var(--mantine-radius-md) 0 0',
+          }}
+        >
+          <Group justify="space-between">
+            <Group gap="xs">
+              {['today', 'week', 'month', 'year'].map((preset) => (
+                <Button
+                  key={preset}
+                  size="xs"
+                  variant={quickPeriod === preset ? 'filled' : 'default'}
+                  onClick={() => applyQuickPeriod(preset)}
+                >
+                  {t(`txns.quick${preset.charAt(0).toUpperCase()}${preset.slice(1)}`)}
+                </Button>
+              ))}
+            </Group>
+            <Text fw={600} size="sm">{t('txns.title')}</Text>
+          </Group>
+        </Box>
+
+        {/* Filter row */}
+        <Group px="md" py="xs" gap="sm" align="flex-end" wrap="wrap">
           <Select
+            size="xs"
             label={t('txns.filterType')}
             placeholder={t('common.all')}
             data={[
@@ -379,59 +467,88 @@ export default function NewTransaction() {
             value={filterType}
             onChange={setFilterType}
             clearable
+            w={120}
           />
+          {isAdmin && (
+            <Select
+              size="xs"
+              label={t('txns.filterUser')}
+              placeholder={t('common.all')}
+              data={userSelectData}
+              value={filterUser}
+              onChange={setFilterUser}
+              clearable
+              searchable
+              w={150}
+            />
+          )}
           <TextInput
+            size="xs"
             label={t('txns.from')}
             type="date"
             value={from}
-            onChange={(e) => setFrom(e.currentTarget.value)}
+            onChange={(e) => { setFrom(e.currentTarget.value); setQuickPeriod(null); }}
+            w={140}
           />
           <TextInput
+            size="xs"
             label={t('txns.to')}
             type="date"
             value={to}
-            onChange={(e) => setTo(e.currentTarget.value)}
+            onChange={(e) => { setTo(e.currentTarget.value); setQuickPeriod(null); }}
+            w={140}
           />
+          <Button size="xs" variant="default" onClick={clearFilters} style={{ alignSelf: 'flex-end' }}>
+            {t('txns.clearFilters')}
+          </Button>
         </Group>
-      </Paper>
 
-      <Paper withBorder radius="md">
+        {/* Table */}
         <ScrollArea>
-          <Table highlightOnHover verticalSpacing="sm" miw={700}>
+          <Table highlightOnHover verticalSpacing="xs" fz="xs" miw={760}>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{t('txns.date')}</Table.Th>
                 <Table.Th>{t('newTxn.type')}</Table.Th>
                 <Table.Th>{t('txns.items')}</Table.Th>
+                <Table.Th w={40}>{t('txns.itemCount')}</Table.Th>
                 <Table.Th>{t('txns.total')}</Table.Th>
                 <Table.Th>{t('txns.profit')}</Table.Th>
-                <Table.Th>{t('txns.note')}</Table.Th>
+                <Table.Th>{t('txns.user')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {historyData.items.map((txn) => (
-                <Table.Tr key={txn.id} style={{ cursor: 'pointer' }} onMouseDown={() => { detailPending.current = true; }} onClick={() => openDetail(txn.id)}>
+                <Table.Tr
+                  key={txn.id}
+                  style={{ cursor: 'pointer' }}
+                  onMouseDown={() => { detailPending.current = true; }}
+                  onClick={() => openDetail(txn.id)}
+                >
                   <Table.Td>{formatDate(txn.created_at, lang)}</Table.Td>
                   <Table.Td>
-                    <Badge variant="light" color={typeColor(txn.type)}>
+                    <Badge size="sm" variant="light" color={typeColor(txn.type)}>
                       {t(`txnType.${txn.type}`)}
                     </Badge>
                   </Table.Td>
-                  <Table.Td>{formatNumber(txn.items?.length ?? 0, lang)}</Table.Td>
+                  <Table.Td>
+                    <Text size="xs" lineClamp={1}>{itemSummary(txn.items)}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">{formatNumber(txn.items?.length ?? 0, lang)}</Text>
+                  </Table.Td>
                   <Table.Td>{formatMoney(txn.total, lang)}</Table.Td>
                   <Table.Td>
                     {txn.type === 'purchase' ? '—' : formatMoney(txn.profit, lang)}
                   </Table.Td>
                   <Table.Td>
-                    <Text size="sm" c="dimmed" lineClamp={1}>
-                      {txn.note || ''}
-                    </Text>
+                    <Text size="xs" c="dimmed">{txn.username_snapshot || '—'}</Text>
                   </Table.Td>
                 </Table.Tr>
               ))}
               {historyData.items.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={7}>
                     <Center p="lg">
                       <Text c="dimmed">{t('common.noResults')}</Text>
                     </Center>
@@ -441,12 +558,14 @@ export default function NewTransaction() {
             </Table.Tbody>
           </Table>
         </ScrollArea>
+
+        {/* Pagination */}
+        <Group justify="flex-end" px="md" py="sm">
+          <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
+        </Group>
       </Paper>
 
-      <Group justify="flex-end">
-        <Pagination total={totalPages} value={page} onChange={setPage} />
-      </Group>
-
+      {/* Product picker modal */}
       <Modal opened={pickerOpened} onClose={pickerHandlers.close} title={t('newTxn.selectProduct')} size="sm">
         <Stack gap="xs">
           {searchResults.map((p) => (
@@ -468,6 +587,7 @@ export default function NewTransaction() {
         </Stack>
       </Modal>
 
+      {/* Transaction detail modal */}
       <Modal opened={opened} onClose={handlers.close} title={t('txns.details')} size="lg">
         {detail && (
           <Stack>
@@ -476,6 +596,9 @@ export default function NewTransaction() {
                 {t(`txnType.${detail.type}`)}
               </Badge>
               <Text c="dimmed">{formatDate(detail.created_at, lang)}</Text>
+              {detail.username_snapshot && (
+                <Text size="sm" c="dimmed">{detail.username_snapshot}</Text>
+              )}
             </Group>
             <Table>
               <Table.Thead>
