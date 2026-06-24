@@ -140,4 +140,30 @@ describe('transactions API', () => {
     expect(detail.history[0].type).toBe('sale');
     expect(detail.history.some((h) => h.type === 'purchase' && h.quantity === 5)).toBe(true);
   });
+
+  it('stores username_snapshot when a user is present on the JWT', async () => {
+    const p = await createProduct({ name: 'SnapPhone', buying_price: 200, selling_price: 300, quantity: 3 });
+    const res = await api
+      .post('/api/transactions')
+      .send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] });
+    expect(res.status).toBe(201);
+    // The seeded owner token is injected by the test helper — username must be present.
+    expect(typeof res.body.username_snapshot).toBe('string');
+    expect(res.body.username_snapshot.length).toBeGreaterThan(0);
+  });
+
+  it('filters by username_snapshot', async () => {
+    const p = await createProduct({ name: 'FilterPhone', buying_price: 100, selling_price: 150, quantity: 5 });
+    await api.post('/api/transactions').send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] });
+
+    // The seeded owner's username is the authenticated user for all api calls in this suite.
+    const ownerUsername = (await api.get('/api/users')).body[0]?.username;
+    expect(ownerUsername).toBeTruthy();
+
+    const filtered = await api.get('/api/transactions').query({ username: ownerUsername });
+    expect(filtered.body.items.every((t) => t.username_snapshot === ownerUsername)).toBe(true);
+
+    const noMatch = await api.get('/api/transactions').query({ username: '__nobody__' });
+    expect(noMatch.body.items.length).toBe(0);
+  });
 });

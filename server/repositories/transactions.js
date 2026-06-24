@@ -49,6 +49,10 @@ export function list(query = {}) {
     where.push('created_at <= @to');
     params.to = query.to;
   }
+  if (query.username) {
+    where.push('username_snapshot = @username');
+    params.username = query.username;
+  }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const page = Math.max(1, Number(query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 20));
@@ -99,7 +103,7 @@ function resolveProduct(item) {
 // Builds + inserts a pure-revenue service transaction: total = cost, profit = 0,
 // no inventory movement. Snapshots the filled custom fields (with their labels) so
 // history survives later edits to the service definition.
-function createServiceTransaction(payload) {
+function createServiceTransaction(payload, user) {
   const service = services.getById(Number(payload.service_id));
   if (!service) {
     const err = new Error('Service not found');
@@ -138,10 +142,18 @@ function createServiceTransaction(payload) {
   const db = getDb();
   const info = db
     .prepare(
-      `INSERT INTO transactions (type, service_id, service_data, note, subtotal, fee, cost_total, total, profit)
-       VALUES ('service', @service_id, @service_data, @note, 0, 0, 0, @total, 0)`,
+      `INSERT INTO transactions
+         (type, service_id, service_data, note, subtotal, fee, cost_total, total, profit, user_id, username_snapshot)
+       VALUES ('service', @service_id, @service_data, @note, 0, 0, 0, @total, 0, @user_id, @username_snapshot)`,
     )
-    .run({ service_id: service.id, service_data: serviceData, note: payload.note || null, total: cost });
+    .run({
+      service_id: service.id,
+      service_data: serviceData,
+      note: payload.note || null,
+      total: cost,
+      user_id: user?.id ?? null,
+      username_snapshot: user?.username ?? null,
+    });
   return getById(info.lastInsertRowid);
 }
 
@@ -155,14 +167,14 @@ function createServiceTransaction(payload) {
  *   items: [{ product_id?|barcode?|name?, quantity, unit_price, unit_cost? }]
  * }
  */
-export function create(payload) {
+export function create(payload, user) {
   const type = payload.type;
   if (!['purchase', 'sale', 'service'].includes(type)) {
     const err = new Error('Invalid transaction type');
     err.status = 400;
     throw err;
   }
-  if (type === 'service') return createServiceTransaction(payload);
+  if (type === 'service') return createServiceTransaction(payload, user);
   const rawItems = Array.isArray(payload.items) ? payload.items : [];
   const fee = type === 'service' ? round2(payload.fee) : 0;
 
@@ -176,14 +188,17 @@ export function create(payload) {
   const run = db.transaction(() => {
     const txnInfo = db
       .prepare(
-        `INSERT INTO transactions (type, service_type_id, note, subtotal, fee, cost_total, total, profit)
-         VALUES (@type, @service_type_id, @note, 0, @fee, 0, 0, 0)`,
+        `INSERT INTO transactions
+           (type, service_type_id, note, subtotal, fee, cost_total, total, profit, user_id, username_snapshot)
+         VALUES (@type, @service_type_id, @note, 0, @fee, 0, 0, 0, @user_id, @username_snapshot)`,
       )
       .run({
         type,
         service_type_id: payload.service_type_id || null,
         note: payload.note || null,
         fee,
+        user_id: user?.id ?? null,
+        username_snapshot: user?.username ?? null,
       });
     const transactionId = txnInfo.lastInsertRowid;
 

@@ -15,7 +15,7 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const result = transactions.create(req.body);
+  const result = transactions.create(req.body, req.user);
   logActivity({ userId: req.user.id, username: req.user.username, action: 'record_transaction', entity: 'transaction', entityId: result.id, detail: { type: result.type } });
   res.status(201).json(result);
 });
