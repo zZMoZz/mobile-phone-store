@@ -60,12 +60,11 @@ function quickRange(preset) {
     return { from: sat.toISOString().slice(0, 10), to: today };
   }
   if (preset === 'month') {
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { from: first.toISOString().slice(0, 10), to: today };
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return { from: `${now.getFullYear()}-${m}-01`, to: today };
   }
   if (preset === 'year') {
-    const first = new Date(now.getFullYear(), 0, 1);
-    return { from: first.toISOString().slice(0, 10), to: today };
+    return { from: `${now.getFullYear()}-01-01`, to: today };
   }
   return { from: '', to: '' };
 }

@@ -5,7 +5,11 @@ import { logActivity } from '../repositories/activityLogs.js';
 const router = Router();
 
 router.get('/', (req, res) => {
-  res.json(transactions.list(req.query));
+  const query = { ...req.query };
+  if (query.username && !['owner', 'admin'].includes(req.user.role)) {
+    delete query.username;
+  }
+  res.json(transactions.list(query));
 });
 
 router.get('/:id', (req, res) => {
