@@ -162,19 +162,22 @@
   "txnType": {
     "purchase": "Purchase",
     "sale": "Sale",
-    "service": "Service"
+    "service": "Service",
+    "return": "Return"
   },
   "newTxn": {
     "title": "Manage Transactions",
     "type": "Type",
     "scanToAdd": "Scan barcode or type product name, then Enter",
-    "manualAdd": "Add Item Manually",
+    "manualAdd": "Add Unlisted Item",
     "cart": "Items",
     "empty": "No items yet. Scan a barcode to add.",
+    "barcode": "Barcode",
     "item": "Item",
     "quantity": "Qty",
     "unitPrice": "Unit Price",
     "unitCost": "Unit Cost",
+    "unitProfit": "Unit Profit",
     "lineTotal": "Total",
     "subtotal": "Subtotal",
     "fee": "Service Fee",
@@ -189,7 +192,10 @@
     "inStock": "In stock",
     "insufficientStock": "Quantity exceeds available stock",
     "newItemName": "New item name",
-    "remove": "Remove"
+    "buyingPrice": "Buying price",
+    "remove": "Remove",
+    "refundPerUnit": "Refund / Unit",
+    "refundTotal": "Refund Total"
   },
   "txns": {
     "title": "Transactions",
@@ -217,12 +223,13 @@
     "nameAr": "Name (Arabic)",
     "manage": "Manage services",
     "recordTitle": "Record service",
-    "cost": "Cost",
+    "cost": "Amount Received",
+    "profit": "Profit",
     "recordWithoutShortcut": "Record without shortcut",
     "recorded": "Service recorded",
     "noShortcuts": "No shortcuts yet",
     "fieldRequired": "Please fill all required fields",
-    "costRequired": "Enter a cost greater than 0"
+    "costRequired": "Enter the amount received"
   },
   "errors": {
     "product_name_required": "Name is required",
@@ -356,7 +363,8 @@
     "editShortcut": "Edit Shortcut",
     "color": "Color",
     "presetValues": "Preset values",
-    "presetCost": "Preset cost",
+    "presetCost": "Preset amount received",
+    "presetProfit": "Preset profit",
     "noShortcuts": "No shortcuts yet",
     "deleteShortcutConfirm": "Delete this shortcut?",
     "presetsCount": "{{count}} presets",

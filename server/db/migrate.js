@@ -113,6 +113,46 @@ function applyColumnMigrations(db) {
     if (changed) db.prepare('UPDATE services SET fields = ? WHERE id = ?').run(JSON.stringify(updated), id);
   });
 
+  // Transactions: expand type CHECK constraint to include 'return'.
+  // SQLite can't ALTER a CHECK constraint, so recreate the table when needed.
+  const txnDef = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='transactions'").get();
+  if (txnDef && !txnDef.sql.includes("'return'")) {
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('DROP TABLE IF EXISTS transactions_new');
+    db.exec(`
+      CREATE TABLE transactions_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        type            TEXT NOT NULL CHECK (type IN ('purchase','sale','service','return')),
+        service_type_id INTEGER REFERENCES service_types(id) ON DELETE SET NULL,
+        service_id      INTEGER REFERENCES services(id) ON DELETE SET NULL,
+        service_data    TEXT,
+        note            TEXT,
+        subtotal        REAL NOT NULL DEFAULT 0,
+        fee             REAL NOT NULL DEFAULT 0,
+        cost_total      REAL NOT NULL DEFAULT 0,
+        total           REAL NOT NULL DEFAULT 0,
+        profit          REAL NOT NULL DEFAULT 0,
+        user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        username_snapshot TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    db.exec(`
+      INSERT INTO transactions_new
+        (id, type, service_type_id, service_id, service_data, note,
+         subtotal, fee, cost_total, total, profit, user_id, username_snapshot, created_at)
+      SELECT
+        id, type, service_type_id, service_id, service_data, note,
+        subtotal, fee, cost_total, total, profit, user_id, username_snapshot, created_at
+      FROM transactions
+    `);
+    db.exec('DROP TABLE transactions');
+    db.exec('ALTER TABLE transactions_new RENAME TO transactions');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_transactions_created ON transactions(created_at)');
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+
   // Ensure at least one owner exists. Pre-auth-overhaul DBs had all users as
   // 'admin'; the recreation above preserves that role, leaving no owner.
   // Promote the oldest admin to owner so the permission matrix works correctly.

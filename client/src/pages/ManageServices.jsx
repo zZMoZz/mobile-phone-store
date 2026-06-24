@@ -97,6 +97,7 @@ export default function ManageServices() {
 
   const [presetValues, setPresetValues] = useState({});
   const [presetCost, setPresetCost] = useState('');
+  const [presetProfit, setPresetProfit] = useState('');
 
   const shortcutForm = useForm({
     initialValues: {
@@ -281,6 +282,7 @@ export default function ManageServices() {
     shortcutForm.setValues({ label_en: '', label_ar: '', color: '' });
     setPresetValues({});
     setPresetCost('');
+    setPresetProfit('');
     shortcutEditorHandlers.open();
   };
 
@@ -288,7 +290,7 @@ export default function ManageServices() {
     const svc = services.find((s) => s.id === sc.service_id) || null;
     setShortcutsService(svc);
     setEditingShortcut(sc);
-    const { cost, ...fieldPresets } = sc.preset_values || {};
+    const { cost, profit: presetProfitVal, ...fieldPresets } = sc.preset_values || {};
     shortcutForm.setValues({
       label_en: sc.label_en || '',
       label_ar: sc.label_ar || '',
@@ -296,6 +298,7 @@ export default function ManageServices() {
     });
     setPresetValues(fieldPresets);
     setPresetCost(cost != null ? cost : '');
+    setPresetProfit(presetProfitVal != null ? presetProfitVal : '');
     shortcutEditorHandlers.open();
   };
 
@@ -309,6 +312,9 @@ export default function ManageServices() {
       }
       if (presetCost !== '' && presetCost != null && !Number.isNaN(Number(presetCost))) {
         pv.cost = Number(presetCost);
+      }
+      if (presetProfit !== '' && presetProfit != null && !Number.isNaN(Number(presetProfit))) {
+        pv.profit = Number(presetProfit);
       }
 
       const payload = {
@@ -786,6 +792,13 @@ export default function ManageServices() {
             min={0}
             value={presetCost === '' ? '' : presetCost}
             onChange={(val) => setPresetCost(val)}
+            mb="sm"
+          />
+          <NumberInput
+            label={t('manageServices.presetProfit')}
+            min={0}
+            value={presetProfit === '' ? '' : presetProfit}
+            onChange={(val) => setPresetProfit(val)}
             mb="md"
           />
 

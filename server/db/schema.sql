@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS service_types (
 
 CREATE TABLE IF NOT EXISTS transactions (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  type            TEXT NOT NULL CHECK (type IN ('purchase','sale','service')),
+  type            TEXT NOT NULL CHECK (type IN ('purchase','sale','service','return')),
   service_type_id INTEGER REFERENCES service_types(id) ON DELETE SET NULL,
   service_id      INTEGER REFERENCES services(id) ON DELETE SET NULL,
   service_data    TEXT,                        -- JSON snapshot for service transactions

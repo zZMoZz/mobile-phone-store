@@ -162,19 +162,22 @@
   "txnType": {
     "purchase": "شراء",
     "sale": "بيع",
-    "service": "الخدمة"
+    "service": "الخدمة",
+    "return": "مرتجع"
   },
   "newTxn": {
     "title": "إدارة المعاملات",
     "type": "النوع",
     "scanToAdd": "امسح الباركود أو اكتب اسم المنتج ثم اضغط Enter",
-    "manualAdd": "إضافة عنصر يدويًا",
+    "manualAdd": "إضافة صنف غير مدرج",
     "cart": "العناصر",
     "empty": "لا توجد عناصر بعد. امسح باركود للإضافة.",
+    "barcode": "الباركود",
     "item": "العنصر",
     "quantity": "الكمية",
     "unitPrice": "سعر الوحدة",
     "unitCost": "تكلفة الوحدة",
+    "unitProfit": "ربح الوحدة",
     "lineTotal": "الإجمالي",
     "subtotal": "المجموع الفرعي",
     "fee": "رسوم الخدمة",
@@ -189,7 +192,10 @@
     "inStock": "المتاح",
     "insufficientStock": "الكمية تتجاوز المخزون المتاح",
     "newItemName": "اسم العنصر الجديد",
-    "remove": "إزالة"
+    "buyingPrice": "سعر الشراء",
+    "remove": "إزالة",
+    "refundPerUnit": "استرداد / وحدة",
+    "refundTotal": "إجمالي الاسترداد"
   },
   "txns": {
     "title": "المعاملات",
@@ -217,12 +223,13 @@
     "nameAr": "الاسم (عربي)",
     "manage": "إدارة الخدمات",
     "recordTitle": "تسجيل خدمة",
-    "cost": "التكلفة",
+    "cost": "المبلغ المستلم",
+    "profit": "الربح",
     "recordWithoutShortcut": "تسجيل بدون اختصار",
     "recorded": "تم تسجيل الخدمة",
     "noShortcuts": "لا توجد اختصارات بعد",
     "fieldRequired": "يرجى ملء جميع الحقول المطلوبة",
-    "costRequired": "أدخل تكلفة أكبر من صفر"
+    "costRequired": "أدخل المبلغ المستلم"
   },
   "errors": {
     "product_name_required": "الاسم مطلوب",
@@ -356,7 +363,8 @@
     "editShortcut": "تعديل الاختصار",
     "color": "اللون",
     "presetValues": "القيم المسبقة",
-    "presetCost": "التكلفة المسبقة",
+    "presetCost": "المبلغ المستلم المسبق",
+    "presetProfit": "الربح المسبق",
     "noShortcuts": "لا توجد اختصارات بعد",
     "deleteShortcutConfirm": "حذف هذا الاختصار؟",
     "presetsCount": "{{count}} قيمة مسبقة",

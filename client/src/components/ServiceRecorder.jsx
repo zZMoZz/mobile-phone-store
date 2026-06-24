@@ -8,6 +8,7 @@ import {
   Modal,
   NumberInput,
   Box,
+  Badge,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -34,6 +35,7 @@ export default function ServiceRecorder() {
   const [activeShortcut, setActiveShortcut] = useState(null);
   const [fieldValues, setFieldValues] = useState({});
   const [cost, setCost] = useState('');
+  const [profit, setProfit] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -52,12 +54,14 @@ export default function ServiceRecorder() {
     setActiveShortcut(shortcut || null);
 
     if (shortcut?.preset_values) {
-      const { cost: presetCost, ...fieldPresets } = shortcut.preset_values;
+      const { cost: presetCost, profit: presetProfit, ...fieldPresets } = shortcut.preset_values;
       setFieldValues(fieldPresets);
       setCost(presetCost != null ? presetCost : '');
+      setProfit(presetProfit != null ? presetProfit : '');
     } else {
       setFieldValues({});
       setCost('');
+      setProfit('');
     }
 
     openModal();
@@ -91,6 +95,7 @@ export default function ServiceRecorder() {
         service_id: activeService.id,
         shortcut_id: activeShortcut?.id,
         cost: costNum,
+        profit: Number(profit) || 0,
         field_values: fieldValues,
       });
       notifications.show({ message: t('services.recorded'), color: 'green' });
@@ -99,6 +104,7 @@ export default function ServiceRecorder() {
       setActiveShortcut(null);
       setFieldValues({});
       setCost('');
+      setProfit('');
     } catch (err) {
       notifications.show({ message: apiErrorMessage(err, t), color: 'red' });
     } finally {
@@ -198,6 +204,13 @@ export default function ServiceRecorder() {
               min={0}
               value={cost}
               onChange={setCost}
+            />
+
+            <NumberInput
+              label={t('services.profit')}
+              min={0}
+              value={profit}
+              onChange={setProfit}
             />
 
             <Group justify="flex-end" mt="xs">

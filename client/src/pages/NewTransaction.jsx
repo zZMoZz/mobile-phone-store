@@ -36,10 +36,19 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 20;
 const MAX_SHOWN = 2;
-const typeColor = (type) => (type === 'sale' ? 'blue' : type === 'purchase' ? 'teal' : 'grape');
+const typeColor = (type) => {
+  if (type === 'sale') return 'blue';
+  if (type === 'purchase') return 'teal';
+  if (type === 'return') return 'orange';
+  return 'grape';
+};
 
-let lineCounter = 0;
-const nextKey = () => `line-${lineCounter++}`;
+const nextKey = () => `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const DRAFT_KEY = 'txn_draft';
+function loadDraft() {
+  try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY)); } catch { return null; }
+}
 
 function itemSummary(items = []) {
   const names = items.map((i) => i.name_snapshot);
@@ -76,10 +85,28 @@ export default function NewTransaction() {
   const { colorScheme } = useMantineColorScheme();
 
   // --- New transaction form ---
-  const [type, setType] = useState('sale');
-  const [lines, setLines] = useState([]);
-  const [note, setNote] = useState('');
+  const [type, setType] = useState(() => loadDraft()?.type ?? 'sale');
+  const [linesByType, setLinesByType] = useState(() => {
+    const draft = loadDraft();
+    const restore = (arr) => (arr ?? []).map((l) => ({ ...l, key: nextKey() }));
+    return {
+      sale: restore(draft?.linesByType?.sale),
+      purchase: restore(draft?.linesByType?.purchase),
+      return: restore(draft?.linesByType?.return),
+    };
+  });
+  const lines = linesByType[type];
+  const setLines = (updater) =>
+    setLinesByType((prev) => ({
+      ...prev,
+      [type]: typeof updater === 'function' ? updater(prev[type]) : updater,
+    }));
+  const [note, setNote] = useState(() => loadDraft()?.note ?? '');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ type, linesByType, note }));
+  }, [type, linesByType, note]);
 
   // --- Transaction history ---
   const [filterType, setFilterType] = useState(null);
@@ -185,6 +212,7 @@ export default function NewTransaction() {
   const totalPages = Math.max(1, Math.ceil(historyData.total / PAGE_SIZE));
 
   // --- Form logic ---
+  // purchase uses buying_price; sale and return both use selling_price
   const priceFor = (product) => (type === 'purchase' ? product.buying_price : product.selling_price);
 
   const addLine = (line) => setLines((prev) => [...prev, { key: nextKey(), ...line }]);
@@ -231,7 +259,7 @@ export default function NewTransaction() {
   };
 
   const addManualLine = () =>
-    addLine({ product_id: null, name: '', barcode: null, quantity: 1, unit_price: 0, unit_cost: 0, locked: false });
+    addLine({ product_id: null, name: '', barcode: null, quantity: 1, unit_price: 0, unit_cost: '', locked: false });
 
   const updateLine = (key, patch) =>
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -250,9 +278,11 @@ export default function NewTransaction() {
     lines.length > 0 &&
     lines.every((l) => {
       if (!l.product_id && !(l.name && l.name.trim())) return false;
+      if (!l.product_id && type === 'sale' && !(Number(l.unit_cost) > 0)) return false;
       if (type === 'sale' && l.stock != null && Number(l.quantity) > l.stock) return false;
       return true;
-    });
+    }) &&
+    (type !== 'return' || lines.every((l) => l.product_id != null));
 
   const submit = async () => {
     setSaving(true);
@@ -296,19 +326,22 @@ export default function NewTransaction() {
 
       <ServiceRecorder />
 
-      <SegmentedControl
-        value={type}
-        onChange={(v) => {
-          setType(v);
-          setLines([]);
-        }}
-        data={[
-          { value: 'sale', label: t('txnType.sale') },
-          { value: 'purchase', label: t('txnType.purchase') },
-        ]}
-      />
-
       <Paper withBorder p="md" radius="md">
+        <SegmentedControl
+          fullWidth
+          value={type}
+          onChange={(v) => {
+            setType(v);
+          }}
+          data={[
+            { value: 'sale', label: t('txnType.sale') },
+            { value: 'purchase', label: t('txnType.purchase') },
+            { value: 'return', label: t('txnType.return') },
+          ]}
+        />
+
+        <Divider my="md" />
+
         <Group align="flex-end" mb="sm">
           <ProductSearchInput
             ref={barcodeRef}
@@ -317,17 +350,22 @@ export default function NewTransaction() {
             placeholder={t('newTxn.scanToAdd')}
             style={{ flex: 1 }}
           />
-          <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
-            {t('newTxn.manualAdd')}
-          </Button>
+          {type !== 'return' && (
+            <Button variant="default" leftSection={<IconPlus size={16} />} onClick={addManualLine}>
+              {t('newTxn.manualAdd')}
+            </Button>
+          )}
         </Group>
 
         <Table verticalSpacing="xs">
           <Table.Thead>
-            <Table.Tr>
+            <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
               <Table.Th>{t('newTxn.item')}</Table.Th>
-              <Table.Th w={90}>{t('newTxn.quantity')}</Table.Th>
-              <Table.Th w={130}>{t('newTxn.unitPrice')}</Table.Th>
+              <Table.Th w={110}>{t('newTxn.barcode')}</Table.Th>
+              <Table.Th w={90}>{t('newTxn.inStock')}</Table.Th>
+              <Table.Th w={70}>{t('newTxn.quantity')}</Table.Th>
+              <Table.Th w={100}>{type === 'return' ? t('newTxn.refundPerUnit') : t('newTxn.unitPrice')}</Table.Th>
+              {type === 'sale' && <Table.Th w={120}>{t('newTxn.unitProfit')}</Table.Th>}
               <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
               <Table.Th w={48} />
             </Table.Tr>
@@ -337,23 +375,35 @@ export default function NewTransaction() {
               <Table.Tr key={l.key}>
                 <Table.Td>
                   {l.product_id ? (
-                    <Stack gap={2}>
-                      <Group gap={6}>
-                        <Text fw={500}>{l.name}</Text>
-                        {l.barcode && <Text size="xs" c="dimmed">{l.barcode}</Text>}
-                      </Group>
-                      {type === 'sale' && l.stock != null && (
-                        <Text size="xs" c={Number(l.quantity) > l.stock ? 'red' : 'dimmed'}>
-                          {t('newTxn.inStock')}: {formatNumber(l.stock, lang)}
-                        </Text>
-                      )}
-                    </Stack>
+                    <Text fw={500}>{l.name}</Text>
                   ) : (
-                    <TextInput
-                      placeholder={t('newTxn.newItemName')}
-                      value={l.name}
-                      onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
-                    />
+                    <Stack gap={4}>
+                      <TextInput
+                        placeholder={t('newTxn.newItemName')}
+                        value={l.name}
+                        onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
+                      />
+                      <NumberInput
+                        placeholder={t('newTxn.buyingPrice')}
+                        value={l.unit_cost}
+                        min={0}
+                        onChange={(v) => updateLine(l.key, { unit_cost: v })}
+                        hideControls
+                        size="xs"
+                      />
+                    </Stack>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm" fw={700} c="dimmed">{l.barcode || '—'}</Text>
+                </Table.Td>
+                <Table.Td>
+                  {l.stock != null ? (
+                    <Text fw={700} c={type === 'sale' && Number(l.quantity) > l.stock ? 'red' : 'dimmed'}>
+                      {formatNumber(l.stock, lang)}
+                    </Text>
+                  ) : (
+                    <Text fw={700} c="dimmed">—</Text>
                   )}
                 </Table.Td>
                 <Table.Td>
@@ -372,7 +422,14 @@ export default function NewTransaction() {
                     hideControls
                   />
                 </Table.Td>
-                <Table.Td>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Table.Td>
+                {type === 'sale' && (
+                  <Table.Td>
+                    <Text fw={700} c={(Number(l.unit_price) - Number(l.unit_cost)) < 0 ? 'red' : 'green'}>
+                      {formatMoney(Number(l.unit_price) - Number(l.unit_cost), lang)}
+                    </Text>
+                  </Table.Td>
+                )}
+                <Table.Td><Text fw={700}>{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0), lang)}</Text></Table.Td>
                 <Table.Td>
                   <ActionIcon variant="subtle" color="red" onClick={() => removeLine(l.key)}>
                     <IconTrash size={16} />
@@ -382,7 +439,7 @@ export default function NewTransaction() {
             ))}
             {lines.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={6}>
+                <Table.Td colSpan={type === 'sale' ? 8 : 7}>
                   <Center p="md">
                     <Text c="dimmed">{t('newTxn.empty')}</Text>
                   </Center>
@@ -391,25 +448,22 @@ export default function NewTransaction() {
             )}
           </Table.Tbody>
         </Table>
-      </Paper>
 
-      <Paper withBorder p="md" radius="md">
+        <Divider mb="md" />
+
         <Textarea label={t('newTxn.note')} value={note} onChange={(e) => setNote(e.currentTarget.value)} mb="md" autosize minRows={1} />
         <Divider mb="sm" />
         <Group justify="space-between">
-          <Stack gap={2}>
-            <Text size="sm" c="dimmed">
-              {t('newTxn.subtotal')}: {formatMoney(totals.subtotal, lang)}
-            </Text>
+          <Group gap="md">
             <Text fw={700}>
-              {t('newTxn.total')}: {formatMoney(totals.total, lang)}
+              {type === 'return' ? t('newTxn.refundTotal') : t('newTxn.total')}: {formatMoney(totals.total, lang)}
             </Text>
-            {type !== 'purchase' && (
-              <Badge color="teal" variant="light">
+            {type === 'sale' && (
+              <Text fw={700} c={totals.profit < 0 ? 'red' : 'green'}>
                 {t('newTxn.profit')}: {formatMoney(totals.profit, lang)}
-              </Badge>
+              </Text>
             )}
-          </Stack>
+          </Group>
           <Button
             size="md"
             leftSection={<IconDeviceFloppy size={18} />}
@@ -462,6 +516,7 @@ export default function NewTransaction() {
               { value: 'sale', label: t('txnType.sale') },
               { value: 'purchase', label: t('txnType.purchase') },
               { value: 'service', label: t('txnType.service') },
+              { value: 'return', label: t('txnType.return') },
             ]}
             value={filterType}
             onChange={setFilterType}
@@ -538,7 +593,7 @@ export default function NewTransaction() {
                   </Table.Td>
                   <Table.Td>{formatMoney(txn.total, lang)}</Table.Td>
                   <Table.Td>
-                    {txn.type === 'purchase' ? '—' : formatMoney(txn.profit, lang)}
+                    {(txn.type === 'purchase' || txn.type === 'return') ? '—' : formatMoney(txn.profit, lang)}
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs" c="dimmed">{txn.username_snapshot || '—'}</Text>
@@ -574,7 +629,7 @@ export default function NewTransaction() {
               justify="space-between"
               fullWidth
               rightSection={
-                <Text size="xs" c="dimmed">
+                <Text size="xs" c="dimmed" fw={700}>
                   {t('newTxn.inStock')}: {formatNumber(p.quantity, lang)}
                 </Text>
               }
@@ -631,7 +686,7 @@ export default function NewTransaction() {
                   {t('newTxn.total')}: {formatMoney(detail.total, lang)}
                 </Text>
               </Stack>
-              {detail.type !== 'purchase' && (
+              {detail.type !== 'purchase' && detail.type !== 'return' && (
                 <Badge color="teal" variant="light" size="lg">
                   {t('newTxn.profit')}: {formatMoney(detail.profit, lang)}
                 </Badge>

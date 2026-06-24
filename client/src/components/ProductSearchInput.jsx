@@ -129,12 +129,12 @@ const ProductSearchInput = forwardRef(function ProductSearchInput(
                   )}
                 </div>
                 <Badge
-                  size="xs"
+                  size="md"
                   variant="light"
                   color={p.quantity > 0 ? 'teal' : 'gray'}
                   style={{ flexShrink: 0 }}
                 >
-                  {lang === 'ar' ? p.quantity : p.quantity}
+                  {p.quantity}
                 </Badge>
               </Group>
             </Combobox.Option>

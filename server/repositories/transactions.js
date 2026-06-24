@@ -100,9 +100,9 @@ function resolveProduct(item) {
   return { product: null };
 }
 
-// Builds + inserts a pure-revenue service transaction: total = cost, profit = 0,
-// no inventory movement. Snapshots the filled custom fields (with their labels) so
-// history survives later edits to the service definition.
+// Builds + inserts a service transaction. `payload.cost` is what the customer pays
+// (stored as `total`); `payload.profit` is the profit entered directly by the user.
+// cost_total is derived: total − profit.
 function createServiceTransaction(payload, user) {
   const service = services.getById(Number(payload.service_id));
   if (!service) {
@@ -111,13 +111,16 @@ function createServiceTransaction(payload, user) {
     err.code = 'service_missing';
     throw err;
   }
-  const cost = round2(payload.cost);
-  if (!(cost > 0)) {
+  const total = round2(payload.cost);
+  if (!(total > 0)) {
     const err = new Error('Cost must be greater than 0');
     err.status = 400;
     err.code = 'service_cost_positive';
     throw err;
   }
+  const profit = round2(payload.profit ?? 0);
+  const costTotal = round2(total - profit);
+
   const values = payload.field_values || {};
   const snapshotFields = service.fields.map((f) => {
     const raw = values[f.key];
@@ -136,7 +139,8 @@ function createServiceTransaction(payload, user) {
     service_name: service.name_en,
     shortcut_id: payload.shortcut_id ? Number(payload.shortcut_id) : null,
     fields: snapshotFields,
-    cost,
+    cost: total,
+    profit,
   });
 
   const db = getDb();
@@ -144,13 +148,15 @@ function createServiceTransaction(payload, user) {
     .prepare(
       `INSERT INTO transactions
          (type, service_id, service_data, note, subtotal, fee, cost_total, total, profit, user_id, username_snapshot)
-       VALUES ('service', @service_id, @service_data, @note, 0, 0, 0, @total, 0, @user_id, @username_snapshot)`,
+       VALUES ('service', @service_id, @service_data, @note, 0, 0, @cost_total, @total, @profit, @user_id, @username_snapshot)`,
     )
     .run({
       service_id: service.id,
       service_data: serviceData,
       note: payload.note || null,
-      total: cost,
+      total,
+      cost_total: costTotal,
+      profit,
       user_id: user?.id ?? null,
       username_snapshot: user?.username ?? null,
     });
@@ -169,7 +175,7 @@ function createServiceTransaction(payload, user) {
  */
 export function create(payload, user) {
   const type = payload.type;
-  if (!['purchase', 'sale', 'service'].includes(type)) {
+  if (!['purchase', 'sale', 'service', 'return'].includes(type)) {
     const err = new Error('Invalid transaction type');
     err.status = 400;
     throw err;
@@ -238,7 +244,7 @@ export function create(payload, user) {
       costTotal += round2(unitCost * quantity);
 
       if (product) {
-        if (type === 'purchase') {
+        if (type === 'purchase' || type === 'return') {
           products.adjustQuantity(product.id, quantity);
         } else {
           products.adjustQuantity(product.id, -quantity);
@@ -254,10 +260,13 @@ export function create(payload, user) {
     let profit;
     if (type === 'purchase') {
       total = subtotal;
-      profit = 0; // purchases are an expense, not profit
+      profit = 0;
+    } else if (type === 'return') {
+      total = subtotal;
+      profit = round2(costTotal - total); // negative: inventory cost restored minus refund paid
     } else if (type === 'service') {
       total = round2(subtotal + fee);
-      profit = round2(total - costTotal); // fee + parts margin
+      profit = round2(total - costTotal);
     } else {
       total = subtotal;
       profit = round2(total - costTotal);
