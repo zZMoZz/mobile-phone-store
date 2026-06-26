@@ -13,6 +13,7 @@ export const CAPABILITY_GROUPS = [
       'txn.service',
       'txn.expense',
       'txn.return',
+      'txn.void',
       'inventory.view',
       'inventory.edit',
       'services.manage',
