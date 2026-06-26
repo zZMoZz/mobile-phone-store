@@ -264,7 +264,15 @@
     "statCost": "الإجمالي بدون الربح",
     "sectionGeneral": "الكل",
     "sectionServices": "الخدمات",
-    "sectionProducts": "المنتجات"
+    "sectionProducts": "المنتجات",
+    "void": {
+      "button": "إلغاء",
+      "confirmTitle": "إلغاء {{type}}؟",
+      "confirmBody": "سيتم عكس جميع تأثيرات المخزون. لا يمكن التراجع عن هذا.",
+      "confirmAction": "إلغاء",
+      "errorExpired": "فات الوقت — انتهت نافذة 5 دقائق.",
+      "errorStock": "لا يمكن الإلغاء — المخزون لـ {{products}} تم بيعه أو استخدامه بالفعل."
+    }
   },
   "services": {
     "title": "الخدمات",

@@ -264,7 +264,15 @@
     "statCost": "Total Excl. Profit",
     "sectionGeneral": "Overall",
     "sectionServices": "Services",
-    "sectionProducts": "Products"
+    "sectionProducts": "Products",
+    "void": {
+      "button": "Void",
+      "confirmTitle": "Void {{type}}?",
+      "confirmBody": "This will reverse all stock effects. It cannot be undone.",
+      "confirmAction": "Void",
+      "errorExpired": "Too late — the 5-minute window has passed.",
+      "errorStock": "Cannot void — stock for {{products}} has already been sold or used."
+    }
   },
   "services": {
     "title": "Services",
