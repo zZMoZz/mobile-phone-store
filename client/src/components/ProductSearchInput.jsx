@@ -117,7 +117,7 @@ const ProductSearchInput = forwardRef(function ProductSearchInput(
         />
       </Combobox.Target>
 
-      <Combobox.Dropdown hidden={results.length === 0}>
+      <Combobox.Dropdown hidden={results.length === 0} data-barcode-dropdown>
         <Combobox.Options>
           {results.map((p) => (
             <Combobox.Option key={p.id} value={String(p.id)}>

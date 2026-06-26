@@ -40,10 +40,12 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
   const [selected, setSelected] = useState(null);
   const [qty, setQty] = useState(1);
   const [cost, setCost] = useState(0);
+  const [qtyError, setQtyError] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const identifyRef = useRef(null);
   const qtyRef = useRef(null);
+  const saveRef = useRef(null);
 
   // Keep the scan/search field focused in the identify step so a scanner always
   // works, even after clicking a non-interactive area inside the modal.
@@ -57,6 +59,7 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
       setResults([]);
       setSelected(null);
       setQty(1);
+      setQtyError(null);
     }
   }, [opened]);
 
@@ -85,16 +88,18 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
     };
   }, [opened, step, debouncedQuery]);
 
-  // Focus the quantity field when entering the restock step.
+  // Focus the Save button when entering the restock step, so a quick scan-then-
+  // Enter confirms the default quantity without first tabbing through the fields.
   useEffect(() => {
     if (step === 'restock') {
-      setTimeout(() => qtyRef.current?.focus(), 0);
+      setTimeout(() => saveRef.current?.focus(), 0);
     }
   }, [step]);
 
   const startRestock = (product) => {
     setSelected(product);
     setQty(1);
+    setQtyError(null);
     // Default the cost to the product's current buying price; the user changes it
     // only when this shipment cost differs. Backend blends it into a weighted average.
     setCost(product.buying_price ?? 0);
@@ -117,7 +122,12 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
 
   const handleSave = async () => {
     const amount = Number(qty);
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setQtyError(t('inventory.addModal.quantityRequired'));
+      qtyRef.current?.focus();
+      return;
+    }
+    setQtyError(null);
     setSaving(true);
     try {
       const updated = await restock(selected.id, amount, Number(cost) || undefined);
@@ -208,8 +218,13 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
             ref={qtyRef}
             label={t('inventory.addModal.quantityToAdd')}
             min={1}
+            allowNegative={false}
+            error={qtyError}
             value={qty}
-            onChange={setQty}
+            onChange={(v) => {
+              setQty(v);
+              if (qtyError) setQtyError(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -222,6 +237,7 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
             label={t('inventory.addModal.costPerUnit')}
             description={t('inventory.addModal.costPerUnitHint')}
             min={0}
+            allowNegative={false}
             value={cost}
             onChange={setCost}
             onKeyDown={(e) => {
@@ -240,7 +256,7 @@ export default function AddProductModal({ opened, onClose, onCreateNew, onRestoc
             >
               {t('common.back')}
             </Button>
-            <Button onClick={handleSave} loading={saving}>
+            <Button ref={saveRef} onClick={handleSave} loading={saving}>
               {t('common.save')}
             </Button>
           </Group>

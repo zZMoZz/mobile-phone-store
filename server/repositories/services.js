@@ -75,9 +75,10 @@ export function create(data) {
   if (db.prepare('SELECT 1 FROM services WHERE LOWER(name_ar) = LOWER(?)').get(name_ar))
     fail(400, 'A service with this Arabic name already exists', 'service_name_ar_taken');
   const fields = JSON.stringify(normalizeFields(data.fields));
+  const direction = data.direction === 'out' ? 'out' : 'in';
   const info = db
-    .prepare('INSERT INTO services (name_en, name_ar, fields, sort_order) VALUES (?, ?, ?, ?)')
-    .run(name_en, name_ar, fields, Number(data.sort_order) || 0);
+    .prepare('INSERT INTO services (name_en, name_ar, fields, sort_order, direction) VALUES (?, ?, ?, ?, ?)')
+    .run(name_en, name_ar, fields, Number(data.sort_order) || 0, direction);
   return getById(info.lastInsertRowid);
 }
 
@@ -94,9 +95,10 @@ export function update(id, data) {
     fail(400, 'A service with this Arabic name already exists', 'service_name_ar_taken');
   const fields = data.fields != null ? JSON.stringify(normalizeFields(data.fields)) : JSON.stringify(existing.fields);
   const sort_order = data.sort_order != null ? Number(data.sort_order) : existing.sort_order;
+  const direction = data.direction === 'out' ? 'out' : data.direction === 'in' ? 'in' : existing.direction ?? 'in';
   getDb()
-    .prepare('UPDATE services SET name_en = ?, name_ar = ?, fields = ?, sort_order = ? WHERE id = ?')
-    .run(name_en, name_ar, fields, sort_order, id);
+    .prepare('UPDATE services SET name_en = ?, name_ar = ?, fields = ?, sort_order = ?, direction = ? WHERE id = ?')
+    .run(name_en, name_ar, fields, sort_order, direction, id);
   return getById(id);
 }
 

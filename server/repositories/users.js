@@ -10,10 +10,18 @@ function makeError(status, code) {
 }
 
 const SAFE_COLS =
-  'id, username, display_name, role, status, force_password_change, token_version, created_at';
+  'id, username, display_name, role, status, force_password_change, token_version, permissions, created_at';
+
+/** Parse the JSON `permissions` column into a real array on a user row. */
+function hydrate(row) {
+  if (!row) return row;
+  let permissions = [];
+  try { permissions = JSON.parse(row.permissions || '[]'); } catch { permissions = []; }
+  return { ...row, permissions: Array.isArray(permissions) ? permissions : [] };
+}
 
 export function getById(id) {
-  return getDb().prepare(`SELECT ${SAFE_COLS} FROM users WHERE id = ?`).get(id);
+  return hydrate(getDb().prepare(`SELECT ${SAFE_COLS} FROM users WHERE id = ?`).get(id));
 }
 
 export function getByIdFull(id) {
@@ -29,10 +37,11 @@ export function findByUsername(username) {
 export function list() {
   return getDb()
     .prepare(`SELECT ${SAFE_COLS} FROM users ORDER BY created_at ASC`)
-    .all();
+    .all()
+    .map(hydrate);
 }
 
-export function create({ username, display_name, password_hash, role, force_password_change = 1 }) {
+export function create({ username, display_name, password_hash, role, permissions = [], force_password_change = 1 }) {
   if (!username?.trim()) throw makeError(400, 'user_username_required');
   if (!['admin', 'staff'].includes(role)) throw makeError(400, 'user_role_invalid');
   const db = getDb();
@@ -42,14 +51,15 @@ export function create({ username, display_name, password_hash, role, force_pass
   if (existing) throw makeError(409, 'user_username_taken');
   const result = db
     .prepare(
-      `INSERT INTO users (username, display_name, password_hash, role, force_password_change)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO users (username, display_name, password_hash, role, permissions, force_password_change)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run(
       username.trim(),
       display_name?.trim() || null,
       password_hash,
       role,
+      JSON.stringify(Array.isArray(permissions) ? permissions : []),
       force_password_change ? 1 : 0,
     );
   return getById(result.lastInsertRowid);
@@ -60,13 +70,13 @@ export function updateFields(id, fields) {
   if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) {
     throw makeError(404, 'user_not_found');
   }
-  const ALLOWED = ['display_name', 'role', 'status', 'password_hash', 'force_password_change'];
+  const ALLOWED = ['display_name', 'role', 'status', 'password_hash', 'force_password_change', 'permissions'];
   const sets = [];
   const values = [];
   for (const key of ALLOWED) {
     if (fields[key] !== undefined) {
       sets.push(`${key} = ?`);
-      values.push(fields[key]);
+      values.push(key === 'permissions' ? JSON.stringify(fields[key] ?? []) : fields[key]);
     }
   }
   if (sets.length === 0) return getById(id);

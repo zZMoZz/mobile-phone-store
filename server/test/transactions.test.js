@@ -46,6 +46,18 @@ describe('transactions API', () => {
     expect(after.quantity).toBe(3); // 5 - 2
   });
 
+  it('blocks a sale that exceeds current stock and leaves stock unchanged', async () => {
+    const p = await createProduct({ name: 'Charger', buying_price: 20, selling_price: 50, quantity: 3 });
+    const res = await api
+      .post('/api/transactions')
+      .send({ type: 'sale', items: [{ product_id: p.id, quantity: 5 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('insufficient_stock');
+
+    const after = await getProduct(p.id);
+    expect(after.quantity).toBe(3); // unchanged — whole transaction rolled back
+  });
+
   it('sale honors an overridden unit price', async () => {
     const p = await createProduct({ name: 'Used Phone', buying_price: 1000, selling_price: 1500, quantity: 1 });
     const res = await api

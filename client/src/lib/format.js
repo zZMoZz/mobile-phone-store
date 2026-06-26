@@ -23,14 +23,21 @@ export function formatNumber(value, lang = 'ar') {
   }).format(Number(value || 0));
 }
 
-/** Formats a numeric amount with grouping and the active currency label. */
-export function formatMoney(amount, lang = 'ar') {
+/**
+ * Formats a numeric amount with grouping and the active currency label.
+ * Pass `{ noCents: true }` to round to whole units and hide the fractional part.
+ */
+export function formatMoney(amount, lang = 'ar', { noCents = false } = {}) {
   const value = Number(amount || 0);
   const label = (CURRENCY_LABELS[currentCurrency] || { en: currentCurrency, ar: currentCurrency })[
     lang === 'ar' ? 'ar' : 'en'
   ];
+  // For whole-unit amounts, skip thousands grouping until the millions — a 6-digit
+  // figure like 462010 reads fine without a separator; grouping only adds value at 7+ digits.
+  const useGrouping = !noCents || Math.abs(value) >= 1_000_000;
   const formatted = new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: noCents ? 0 : 2,
+    useGrouping,
   }).format(value);
   return lang === 'ar' ? `${formatted} ${label}` : `${label} ${formatted}`;
 }

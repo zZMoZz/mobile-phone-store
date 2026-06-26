@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS services (
   name_en    TEXT NOT NULL,
   name_ar    TEXT NOT NULL,
   fields     TEXT NOT NULL DEFAULT '[]',  -- JSON array of field defs
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  direction  TEXT NOT NULL DEFAULT 'in' CHECK (direction IN ('in','out'))
 );
 
 CREATE TABLE IF NOT EXISTS service_shortcuts (
@@ -124,6 +125,7 @@ CREATE TABLE IF NOT EXISTS users (
   force_password_change INTEGER NOT NULL DEFAULT 0,
   token_version         INTEGER NOT NULL DEFAULT 0,
   recovery_code_hash    TEXT,
+  permissions           TEXT NOT NULL DEFAULT '[]',  -- JSON array of capability keys (owner = implicit all)
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

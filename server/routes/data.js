@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { requireAdmin } from '../middleware/requireAdmin.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 import { logActivity } from '../repositories/activityLogs.js';
 import { createBackup } from '../lib/backup.js';
 import { toCsv } from '../lib/csv.js';
 
 const router = Router();
+const canBackup = requirePermission('data.backup');
 
 // Trigger a database backup (copy of the SQLite file).
-router.post('/backup', requireAdmin, async (req, res, next) => {
+router.post('/backup', canBackup, async (req, res, next) => {
   try {
     const result = await createBackup(req.body?.dir || undefined);
     logActivity({ userId: req.user.id, username: req.user.username, action: 'create_backup' });
@@ -24,7 +25,7 @@ function sendCsv(res, name, csv) {
   res.send(csv);
 }
 
-router.get('/export/products.csv', requireAdmin, (req, res) => {
+router.get('/export/products.csv', canBackup, (req, res) => {
   const ar = req.query.lang === 'ar';
   const nameCol = ar ? 'name_ar' : 'name_en';
   const rows = getDb()
@@ -69,7 +70,7 @@ router.get('/export/products.csv', requireAdmin, (req, res) => {
   sendCsv(res, 'products.csv', csv);
 });
 
-router.get('/export/transactions.csv', requireAdmin, (req, res) => {
+router.get('/export/transactions.csv', canBackup, (req, res) => {
   const rows = getDb()
     .prepare(
       `SELECT t.id, t.type, t.created_at, t.subtotal, t.fee, t.cost_total, t.total, t.profit,

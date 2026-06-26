@@ -55,7 +55,8 @@ function formatDetail(detail) {
 export default function ActivityLog() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canSeeOthers = can('see.others_transactions');
 
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -66,10 +67,10 @@ export default function ActivityLog() {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canSeeOthers) {
       listUsers().then(setUsers).catch(() => {});
     }
-  }, [isAdmin]);
+  }, [canSeeOthers]);
 
   useEffect(() => {
     const params = { page, pageSize: PAGE_SIZE };
@@ -112,7 +113,7 @@ export default function ActivityLog() {
             searchable
             size="sm"
           />
-          {isAdmin && (
+          {canSeeOthers && (
             <Select
               label={t('activityLog.filterUser')}
               placeholder={t('activityLog.allUsers')}

@@ -8,7 +8,8 @@ Internal management web app for a small mobile phone store. **Staff-only**, runs
 **locally on one Windows laptop**, offline-capable. Two core jobs: manage product
 **inventory** and record **transactions** (purchases, sales, services). Supports
 **dark mode** and **Arabic + English** (RTL for Arabic). No customer-facing features,
-no printed receipts, no authentication (v1).
+no printed receipts. Access is **login-based (JWT)** with **per-user capabilities**
+(see below).
 
 ## Stack
 
@@ -72,5 +73,18 @@ npm start              # production: Express serves API + client/dist on 4000
   `unit_cost` is snapshotted per line; `profit = total − cost_total`.
 - **Images:** uploaded to `data/uploads/`; missing image falls back to
   `/assets/default-product.svg`.
+- **Auth & capabilities:** JWT login (`server/middleware/authenticate.js` attaches
+  `req.user`). Access is gated by **per-user capabilities**, not fixed roles — the
+  catalog and helpers live in `server/lib/permissions.js` (`CAPABILITIES`,
+  `userHas`, `sanitizePermissions`, `PRESETS`); the client mirror is
+  `client/src/lib/permissions.js`. Each user has a `permissions` JSON array; the
+  **owner** implicitly holds all capabilities and is the **only** account that can
+  assign them. `role` (`owner`/`admin`/`staff`) is now just a **preset label** used
+  to pre-fill the capability checklist — never gate on it; gate on a capability.
+  Backend: `requirePermission(cap)` middleware (`server/middleware/`); transactions
+  gate per type. Frontend: `useAuth().can(cap)` plus `<ProtectedRoute requiredCap>`.
+  Changing a user's capabilities bumps `token_version` (forces re-login). New
+  capabilities must be added to **both** `permissions.js` files and given i18n
+  labels (`permissions.caps.*`, underscored) in `en.json` + `ar.json`.
 
 See `.claude/plans/` for the approved build plan and phase breakdown.

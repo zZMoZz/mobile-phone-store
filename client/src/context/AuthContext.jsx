@@ -98,12 +98,18 @@ export function AuthProvider({ children }) {
     return updated;
   }, [user]);
 
-  const isAdmin = useMemo(() => user?.role === 'admin' || user?.role === 'owner', [user]);
   const isOwner = useMemo(() => user?.role === 'owner', [user]);
 
+  // Capability check: the owner implicitly holds every capability; everyone else
+  // is gated by their explicit permissions array.
+  const can = useCallback(
+    (cap) => user?.role === 'owner' || (user?.permissions ?? []).includes(cap),
+    [user],
+  );
+
   const value = useMemo(
-    () => ({ user, loading, isAdmin, isOwner, login, logout: handleLogout, forceChangePassword, changePassword, updateUserInContext }),
-    [user, loading, isAdmin, isOwner, login, handleLogout, forceChangePassword, changePassword, updateUserInContext],
+    () => ({ user, loading, isOwner, can, login, logout: handleLogout, forceChangePassword, changePassword, updateUserInContext }),
+    [user, loading, isOwner, can, login, handleLogout, forceChangePassword, changePassword, updateUserInContext],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

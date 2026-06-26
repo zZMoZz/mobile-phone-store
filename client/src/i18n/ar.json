@@ -4,8 +4,8 @@
   },
   "nav": {
     "dashboard": "لوحة المعلومات",
-    "inventory": "المخزون",
-    "newTransaction": "إدارة المعاملات",
+    "inventory": "إدارة المخزون",
+    "newTransaction": "إنشاء معاملة",
     "transactions": "المعاملات",
     "services": "إدارة الخدمات",
     "lists": "الأقسام والعلامات التجارية",
@@ -75,7 +75,7 @@
     "expand": "توسيع القائمة"
   },
   "inventory": {
-    "title": "المخزون",
+    "title": "إدارة المخزون",
     "addProduct": "إضافة منتج",
     "addStock": "إضافة كمية (مسح)",
     "addModal": {
@@ -86,7 +86,8 @@
       "quantityToAdd": "الكمية المُضافة",
       "costPerUnit": "تكلفة الوحدة",
       "costPerUnitHint": "القيمة الافتراضية هي التكلفة الحالية؛ غيّرها إذا اختلفت تكلفة هذه الدفعة",
-      "currentStock": "الكمية الحالية"
+      "currentStock": "الكمية الحالية",
+      "quantityRequired": "أدخل كمية لا تقل عن ١"
     },
     "scanPrompt": "امسح أو اكتب الباركود ثم اضغط Enter",
     "searchPlaceholder": "ابحث بالاسم أو الباركود",
@@ -94,6 +95,7 @@
     "priceRange": "نطاق سعر البيع",
     "minPrice": "اقل سعر",
     "maxPrice": "اعلى سعر",
+    "priceFilterNote": "حسب سعر البيع",
     "minQty": "أقل كمية",
     "maxQty": "أعلى كمية",
     "inStockOnly": "المتوفر فقط",
@@ -106,7 +108,7 @@
     "addedTo": "إلى تاريخ",
     "summary": {
       "totalUnits": "إجمالي المنتجات",
-      "uniqueProducts": "عدد المنتجات المختلفة",
+      "uniqueProducts": "المنتجات المختلفة",
       "sellValue": "قيمة المخزون (بيع)",
       "costValue": "قيمة البضاعة",
       "costValueHint": "محسوبة بسعر الشراء",
@@ -126,13 +128,23 @@
       "updatedAt": "آخر تعديل"
     },
     "stockAdded": "تم تحديث الكمية",
+    "deleteTitle": "حذف المنتج",
     "deleteConfirm": "حذف هذا المنتج؟",
-    "period": {
-      "label": "أُضيف",
-      "all": "كل الأوقات",
-      "today": "اليوم",
-      "week": "هذا الأسبوع",
-      "month": "هذا الشهر"
+    "bulk": {
+      "selectAllMatching": "تحديد كل النتائج ({{count}})",
+      "selectedCount": "{{count}} محدد",
+      "clear": "إلغاء التحديد",
+      "delete": "حذف",
+      "edit": "تعديل القسم / العلامة التجارية",
+      "deleteTitle": "حذف المنتجات المحددة",
+      "deleteConfirm": "حذف {{count}} منتجًا محددًا؟ لا يمكن التراجع عن هذا الإجراء.",
+      "hasStockWarning": "{{count}} من المنتجات ما زال لديه مخزون {{units}} وحدة. الحذف سيؤدي إلى إزالة هذا المخزون",
+      "deleted": "تم حذف {{count}} منتجًا",
+      "editTitle": "تعديل المنتجات المحددة",
+      "editHint": "اترك الحقل دون تغيير للإبقاء عليه كما هو. اختر \"مسح\" لإزالة القيمة.",
+      "keepUnchanged": "دون تغيير",
+      "apply": "تطبيق",
+      "updated": "تم تحديث {{count}} منتجًا"
     }
   },
   "product": {
@@ -143,7 +155,7 @@
     "category": "القسم",
     "brand": "العلامة التجارية",
     "quantity": "الكمية",
-    "initialStock": "المخزون الأولي",
+    "initialStock": "الكمية الأولية",
     "quantityReadOnlyHint": "استخدم \"إضافة مخزون\" لتغيير الكمية",
     "barcode": "الباركود",
     "image": "الصورة",
@@ -155,19 +167,26 @@
     "categoryRequired": "القسم مطلوب",
     "brandRequired": "العلامة التجارية مطلوبة",
     "details": "تفاصيل المنتج",
+    "sell": "بيع",
     "history": "سجل المعاملات",
     "noHistory": "لا توجد معاملات بعد",
+    "date": "التاريخ",
+    "txnId": "رقم العملية",
+    "action": "الإجراء",
+    "unitPrice": "سعر الوحدة",
+    "profit": "الربح",
+    "user": "المستخدم",
     "temporary": "منتج مؤقت"
   },
   "txnType": {
     "purchase": "شراء",
     "sale": "بيع",
-    "service": "الخدمة",
+    "service": "خدمة",
     "return": "مرتجع",
-    "expense": "مصروف"
+    "expense": "مصروفات"
   },
   "expense": {
-    "record": "مصروف",
+    "record": "مصروفات",
     "recordTitle": "تسجيل مصروف",
     "label": "البيان",
     "labelPlaceholder": "مثال: إيجار المحل",
@@ -178,7 +197,7 @@
     "amountRequired": "يجب أن يكون المبلغ أكبر من 0"
   },
   "newTxn": {
-    "title": "إدارة المعاملات",
+    "title": "إنشاء معاملة",
     "type": "النوع",
     "scanToAdd": "امسح الباركود أو اكتب اسم المنتج ثم اضغط Enter",
     "manualAdd": "إضافة صنف غير مدرج",
@@ -230,7 +249,15 @@
     "quickWeek": "هذا الأسبوع",
     "quickMonth": "هذا الشهر",
     "quickYear": "هذه السنة",
-    "clearFilters": "مسح"
+    "clearFilters": "مسح",
+    "txnId": "رقم",
+    "filterService": "الخدمة",
+    "filterDirection": "الاتجاه",
+    "directionIn": "دخل",
+    "directionOut": "خرج",
+    "statTotal": "الإجمالي",
+    "statProfit": "الأرباح",
+    "statCost": "الإجمالي بدون الأرباح"
   },
   "services": {
     "title": "الخدمات",
@@ -239,6 +266,8 @@
     "manage": "إدارة الخدمات",
     "recordTitle": "تسجيل خدمة",
     "cost": "المبلغ المستلم",
+    "costIn": "المبلغ المستلم",
+    "costOut": "المبلغ المدفوع",
     "profit": "الربح",
     "recordWithoutShortcut": "تسجيل بدون اختصار",
     "recorded": "تم تسجيل الخدمة",
@@ -290,7 +319,8 @@
     "optlist_name_en_duplicate": "هذا الاسم مستخدم في قائمة أخرى",
     "optlist_name_ar_duplicate": "هذا الاسم مستخدم في قائمة أخرى",
     "optlist_option_dup_en": "اسم الخيار الإنجليزي مكرر",
-    "optlist_option_dup_ar": "اسم الخيار العربي مكرر"
+    "optlist_option_dup_ar": "اسم الخيار العربي مكرر",
+    "insufficient_stock": "الكمية غير كافية للمنتج \"{{name}}\": المتاح {{available}}، المطلوب {{requested}}"
   },
   "lists": {
     "title": "الأقسام والعلامات التجارية",
@@ -385,7 +415,10 @@
     "deleteShortcutConfirm": "حذف هذا الاختصار؟",
     "presetsCount": "{{count}} قيمة مسبقة",
     "allServices": "كل الخدمات",
-    "searchShortcuts": "بحث في الاختصارات..."
+    "searchShortcuts": "بحث في الاختصارات...",
+    "direction": "الاتجاه",
+    "directionIn": "دخل (استلام)",
+    "directionOut": "خروج (دفع)"
   },
   "users": {
     "title": "المستخدمون",
@@ -416,7 +449,33 @@
     "tempPassword": "كلمة مرور مؤقتة",
     "tempPasswordHint": "سيُطلب من المستخدم تغييرها عند تسجيل الدخول التالي.",
     "status": "الحالة",
+    "roleHint": "إعداد مبدئي. اضبط الصلاحيات بدقة بالأسفل.",
     "newUserHint": "سيُطلب من المستخدم تعيين كلمة مروره الخاصة عند تسجيل الدخول لأول مرة."
+  },
+  "permissions": {
+    "title": "الصلاحيات",
+    "presetAdmin": "إعداد المدير",
+    "presetStaff": "إعداد الموظف",
+    "group": {
+      "see": "يمكنه رؤية",
+      "do": "يمكنه تنفيذ"
+    },
+    "caps": {
+      "see_cost": "التكلفة والربح/الهامش",
+      "see_others_transactions": "معاملات المستخدمين الآخرين",
+      "see_activity_log": "سجل النشاط",
+      "txn_sale": "تسجيل المبيعات",
+      "txn_service": "تسجيل الخدمات",
+      "txn_expense": "تسجيل المصروفات",
+      "txn_return": "تنفيذ المرتجعات/الإلغاء",
+      "inventory_view": "عرض المخزون",
+      "inventory_edit": "إضافة/تعديل المخزون",
+      "services_manage": "إدارة كتالوج الخدمات",
+      "lists_manage": "إدارة الفئات والقوائم",
+      "settings_manage": "إدارة إعدادات التطبيق",
+      "data_backup": "النسخ الاحتياطي وتصدير البيانات",
+      "users_manage": "إدارة المستخدمين"
+    }
   },
   "activityLog": {
     "title": "سجل النشاط",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import {
   Stack,
   Group,
@@ -8,9 +8,11 @@ import {
   Modal,
   NumberInput,
   Box,
-  Badge,
+  Paper,
+  ScrollArea,
+  Divider,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useElementSize } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { listServices } from '../api/services.js';
@@ -19,6 +21,17 @@ import { listOptionLists } from '../api/optionLists.js';
 import { createTransaction } from '../api/transactions.js';
 import { ServiceFieldInput } from './ServiceFieldInputs.jsx';
 import { apiErrorMessage } from '../lib/apiError.js';
+
+// Fixed service-column width, the gap between shortcut cards, and the gutter
+// around the divider line. COL_GUTTER is twice SHORTCUT_GAP so that, with the
+// line at its midpoint, the whitespace from the line to the nearest shortcut
+// equals the gap between shortcut cards (and the line stays centered).
+const SERVICE_COL_W = 180;
+const SHORTCUT_GAP = 12;
+const COL_GUTTER = SHORTCUT_GAP * 2;
+
+// Below this paper width, switch to the compact horizontal-headers layout.
+const COMPACT_BREAKPOINT = 560;
 
 export default function ServiceRecorder() {
   const { t, i18n } = useTranslation();
@@ -37,6 +50,9 @@ export default function ServiceRecorder() {
   const [cost, setCost] = useState('');
   const [profit, setProfit] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const { ref: paperRef, width: paperWidth } = useElementSize();
+  const isCompact = paperWidth > 0 && paperWidth < COMPACT_BREAKPOINT;
 
   useEffect(() => {
     Promise.all([listServices(), listServiceShortcuts(), listOptionLists()])
@@ -115,6 +131,47 @@ export default function ServiceRecorder() {
   const serviceName = (svc) => (lang === 'ar' ? svc.name_ar : svc.name_en);
   const shortcutLabel = (sc) => (lang === 'ar' ? sc.label_ar : sc.label_en);
 
+  // Shared card renderers — variant="default" for service buttons gives a visible
+  // gray fill in light mode (no more invisible white-on-white). Shortcut buttons
+  // use variant="filled" when they have a color so they read clearly in light mode,
+  // and variant="default" when they don't.
+  const ServiceCard = ({ svc, fullWidth }) => (
+    <Card
+      withBorder
+      radius="md"
+      p={0}
+      style={{ cursor: 'pointer', width: fullWidth ? '100%' : undefined }}
+      onClick={() => openRecord(svc, null)}
+    >
+      <Button
+        variant="default"
+        styles={{ root: { pointerEvents: 'none', width: '100%' } }}
+        size="sm"
+      >
+        {serviceName(svc)}
+      </Button>
+    </Card>
+  );
+
+  const ShortcutCard = ({ svc, sc, fullWidth }) => (
+    <Card
+      withBorder
+      radius="md"
+      p={0}
+      style={{ cursor: 'pointer', width: fullWidth ? '100%' : undefined }}
+      onClick={() => openRecord(svc, sc)}
+    >
+      <Button
+        variant={sc.color ? 'filled' : 'default'}
+        color={sc.color || undefined}
+        styles={{ root: { pointerEvents: 'none', width: '100%' } }}
+        size="sm"
+      >
+        {shortcutLabel(sc)}
+      </Button>
+    </Card>
+  );
+
   if (!loading && services.length === 0) {
     return (
       <Text c="dimmed" ta="center" py="xl">
@@ -125,47 +182,103 @@ export default function ServiceRecorder() {
 
   return (
     <>
-      <Group gap="sm" wrap="wrap">
-        {services.flatMap((svc) => {
-          const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
-          return [
-            <Card
-              key={`plain-${svc.id}`}
-              withBorder
-              radius="md"
-              p={0}
-              style={{ cursor: 'pointer', borderLeft: '4px solid var(--mantine-color-gray-4)' }}
-              onClick={() => openRecord(svc, null)}
-            >
-              <Button variant="subtle" color="gray" styles={{ root: { pointerEvents: 'none' } }} size="sm">
-                {serviceName(svc)}
-              </Button>
-            </Card>,
-            ...svcShortcuts.map((sc) => (
-              <Card
-                key={sc.id}
-                withBorder
-                radius="md"
-                p={0}
+      <Paper ref={paperRef} withBorder p="md" radius="md">
+        {/* Show at most ~6 rows; scroll inside the box beyond that. A row is a
+            36px button + 2px card border + 12px Stack gap ≈ 50px. */}
+        <ScrollArea.Autosize mah={6 * 50} type="auto" offsetScrollbars>
+          {isCompact ? (
+            // Compact layout: services as a horizontal header row, shortcuts in columns below
+            <Stack gap={0}>
+              {/* Header row — one cell per service */}
+              <Box style={{ display: 'flex', alignItems: 'stretch' }}>
+                {services.map((svc, i) => (
+                  <Fragment key={svc.id}>
+                    {i > 0 && (
+                      <Box
+                        style={{
+                          width: 1,
+                          flexShrink: 0,
+                          background: 'var(--mantine-color-default-border)',
+                          margin: `0 ${SHORTCUT_GAP / 2}px`,
+                        }}
+                      />
+                    )}
+                    <Box style={{ flex: 1, minWidth: 0 }}>
+                      <ServiceCard svc={svc} fullWidth />
+                    </Box>
+                  </Fragment>
+                ))}
+              </Box>
+
+              <Divider my="sm" />
+
+              {/* Shortcuts row — one column per service */}
+              <Box style={{ display: 'flex', alignItems: 'flex-start' }}>
+                {services.map((svc, i) => {
+                  const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
+                  return (
+                    <Fragment key={svc.id}>
+                      {i > 0 && (
+                        <Box
+                          style={{
+                            width: 1,
+                            flexShrink: 0,
+                            alignSelf: 'stretch',
+                            background: 'var(--mantine-color-default-border)',
+                            margin: `0 ${SHORTCUT_GAP / 2}px`,
+                          }}
+                        />
+                      )}
+                      <Stack gap={SHORTCUT_GAP} style={{ flex: 1, minWidth: 0 }}>
+                        {svcShortcuts.map((sc) => (
+                          <ShortcutCard key={sc.id} svc={svc} sc={sc} fullWidth />
+                        ))}
+                      </Stack>
+                    </Fragment>
+                  );
+                })}
+              </Box>
+            </Stack>
+          ) : (
+            // Normal layout: services in a fixed left column, shortcuts to the right
+            <Stack gap="sm" pos="relative">
+              {/* One continuous vertical line at the service/shortcuts boundary.
+                  The 180px service column and the 16px row gutter are the single
+                  source of truth (see SERVICE_COL_W / COL_GUTTER); the line sits at
+                  their midpoint so the whitespace is identical on both sides.
+                  insetInlineStart (not left) keeps it on the correct side in RTL. */}
+              <Box
                 style={{
-                  cursor: 'pointer',
-                  borderLeft: `4px solid var(--mantine-color-${sc.color || 'gray'}-5)`,
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  insetInlineStart: SERVICE_COL_W + COL_GUTTER / 2,
+                  width: 1,
+                  background: 'var(--mantine-color-default-border)',
                 }}
-                onClick={() => openRecord(svc, sc)}
-              >
-                <Button
-                  variant="light"
-                  color={sc.color || 'gray'}
-                  styles={{ root: { pointerEvents: 'none' } }}
-                  size="sm"
-                >
-                  {shortcutLabel(sc)}
-                </Button>
-              </Card>
-            )),
-          ];
-        })}
-      </Group>
+              />
+              {services.map((svc) => {
+                const svcShortcuts = shortcuts.filter((sc) => sc.service_id === svc.id);
+                return (
+                  <Group key={svc.id} gap={COL_GUTTER} wrap="nowrap" align="flex-start">
+                    {/* Fixed-width service column so the line stays aligned across rows */}
+                    <Box style={{ width: SERVICE_COL_W, flexShrink: 0, display: 'flex' }}>
+                      <ServiceCard svc={svc} fullWidth />
+                    </Box>
+
+                    {/* Shortcuts column */}
+                    <Group gap={SHORTCUT_GAP} wrap="wrap" style={{ flex: 1 }}>
+                      {svcShortcuts.map((sc) => (
+                        <ShortcutCard key={sc.id} svc={svc} sc={sc} />
+                      ))}
+                    </Group>
+                  </Group>
+                );
+              })}
+            </Stack>
+          )}
+        </ScrollArea.Autosize>
+      </Paper>
 
       {/* Record modal */}
       <Modal
@@ -199,7 +312,7 @@ export default function ServiceRecorder() {
             ))}
 
             <NumberInput
-              label={t('services.cost')}
+              label={activeService?.direction === 'out' ? t('services.costOut') : t('services.costIn')}
               required
               min={0}
               value={cost}

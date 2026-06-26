@@ -10,6 +10,11 @@ export async function getProduct(id) {
   return data;
 }
 
+export async function getProductHistory(id, params) {
+  const { data } = await api.get(`/products/${id}/history`, { params });
+  return data;
+}
+
 export async function getSummary(params) {
   const { data } = await api.get('/products/summary', { params });
   return data;
@@ -47,6 +52,26 @@ export async function updateProduct(id, body) {
 
 export async function deleteProduct(id) {
   await api.delete(`/products/${id}`);
+}
+
+export async function listProductIds(params) {
+  const { data } = await api.get('/products/ids', { params });
+  return data;
+}
+
+export async function productsStockCheck(ids) {
+  const { data } = await api.post('/products/stock-check', { ids });
+  return data;
+}
+
+export async function bulkDeleteProducts(ids) {
+  const { data } = await api.post('/products/bulk-delete', { ids });
+  return data;
+}
+
+export async function bulkUpdateProducts(ids, fields) {
+  const { data } = await api.post('/products/bulk-update', { ids, ...fields });
+  return data;
 }
 
 export async function uploadProductImage(id, file) {

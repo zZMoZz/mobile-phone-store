@@ -20,6 +20,7 @@ import {
   SimpleGrid,
   Alert,
   List,
+  Checkbox,
 } from '@mantine/core';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -48,6 +49,7 @@ import { useSettings } from '../context/SettingsContext.jsx';
 import { setLanguage } from '../i18n/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDate } from '../lib/format.js';
+import { CAPABILITY_GROUPS, PRESETS } from '../lib/permissions.js';
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
@@ -58,7 +60,10 @@ export default function Settings() {
   const defaultNameAr = i18n.getFixedT('ar')('app.title');
   const { setSettings } = useSettings();
   const { setColorScheme } = useMantineColorScheme();
-  const { isAdmin, isOwner, user: currentUser } = useAuth();
+  const { can, isOwner, user: currentUser } = useAuth();
+  const canSettings = can('settings.manage');
+  const canBackup = can('data.backup');
+  const canUsers = can('users.manage');
 
   // Settings state
   const [values, setValues] = useState(null);
@@ -79,6 +84,7 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('staff');
+  const [permissions, setPermissions] = useState(PRESETS.staff);
   const [tempPassword, setTempPassword] = useState('');
   const [userSaving, setUserSaving] = useState(false);
   const [resetSaving, setResetSaving] = useState(false);
@@ -88,8 +94,8 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    if (isAdmin) loadUsers();
-  }, [isAdmin]);
+    if (canUsers) loadUsers();
+  }, [canUsers]);
 
   const set = (key) => (val) =>
     setValues((v) => ({ ...v, [key]: val?.currentTarget ? val.currentTarget.value : val }));
@@ -160,6 +166,7 @@ export default function Settings() {
     setDisplayName('');
     setPassword('');
     setRole('staff');
+    setPermissions(PRESETS.staff);
     openUserModal();
   };
 
@@ -169,6 +176,7 @@ export default function Settings() {
     setDisplayName(u.display_name || '');
     setPassword('');
     setRole(u.role);
+    setPermissions(u.permissions ?? []);
     openUserModal();
   };
 
@@ -185,9 +193,21 @@ export default function Settings() {
         const patch = {};
         if (displayName !== (editing.display_name || '')) patch.display_name = displayName.trim() || null;
         if (role !== editing.role) patch.role = role;
+        // Capabilities are owner-only; send them when they actually changed.
+        if (isOwner && JSON.stringify(permissions) !== JSON.stringify(editing.permissions ?? [])) {
+          patch.permissions = permissions;
+        }
         if (Object.keys(patch).length > 0) await updateUser(editing.id, patch);
       } else {
-        await createUser({ username, display_name: displayName.trim() || null, password, role });
+        await createUser({
+          username,
+          display_name: displayName.trim() || null,
+          password,
+          role,
+          // Only the owner may confer custom capabilities; the server ignores this
+          // field for delegated managers and applies the staff preset.
+          permissions: isOwner ? permissions : undefined,
+        });
       }
       notifications.show({ message: t('common.saved'), color: 'green' });
       closeUserModal();
@@ -246,28 +266,11 @@ export default function Settings() {
     }
   };
 
-  // What the current viewer can do to a given target user
-  const canEdit = (u) => {
-    if (u.role === 'owner') return false;
-    if (isOwner) return true;
-    if (isAdmin && u.role === 'staff') return true;
-    return false;
-  };
-
-  const canResetPassword = (u) => {
-    if (u.role === 'owner') return false;
-    if (isOwner) return true;
-    if (isAdmin && u.role === 'staff') return true;
-    return false;
-  };
-
-  const canToggleStatus = (u) => {
-    if (u.id === currentUser?.id) return false;
-    if (u.role === 'owner') return false;
-    if (isOwner) return true;
-    if (isAdmin && u.role === 'staff') return true;
-    return false;
-  };
+  // What the current viewer can do to a given target user. The owner account is
+  // always protected; otherwise any users.manage holder may manage non-owners.
+  const canEditUser = (u) => canUsers && u.role !== 'owner';
+  const canResetPassword = (u) => canUsers && u.role !== 'owner' && u.id !== currentUser?.id;
+  const canToggleStatus = (u) => canUsers && u.role !== 'owner' && u.id !== currentUser?.id;
 
   const roleColor = (r) => ({ owner: 'grape', admin: 'violet', staff: 'blue' })[r] ?? 'gray';
   const statusColor = (s) => (s === 'ACTIVE' ? 'green' : 'red');
@@ -287,6 +290,7 @@ export default function Settings() {
     <Stack>
       <Title order={2}>{t('settings.title')}</Title>
 
+      {canSettings && (
       <Paper withBorder p="lg" radius="md">
         <Stack>
           <Group grow>
@@ -336,18 +340,15 @@ export default function Settings() {
             onChange={set('low_stock_threshold')}
           />
           <Group justify="flex-end">
-            <Tooltip label={t('auth.adminOnly')} disabled={isAdmin}>
-              <span>
-                <Button leftSection={<IconDeviceFloppy size={18} />} loading={saving} onClick={save} disabled={!isAdmin}>
-                  {t('common.save')}
-                </Button>
-              </span>
-            </Tooltip>
+            <Button leftSection={<IconDeviceFloppy size={18} />} loading={saving} onClick={save}>
+              {t('common.save')}
+            </Button>
           </Group>
         </Stack>
       </Paper>
+      )}
 
-      {isAdmin && (
+      {canBackup && (
         <Paper withBorder p="lg" radius="md">
           <Text fw={600} fz="md" mb="xs">
             {t('settings.data')}
@@ -401,7 +402,7 @@ export default function Settings() {
         </Paper>
       )}
 
-      {isAdmin && (
+      {canUsers && (
         <Paper withBorder radius="md">
           <Group justify="space-between" align="center" p="lg" pb="xs">
             <Text fw={600} fz="md">{t('users.title')}</Text>
@@ -439,7 +440,7 @@ export default function Settings() {
                   <Table.Td>{formatDate(u.created_at, lang)}</Table.Td>
                   <Table.Td>
                     <Group gap={4} justify="flex-end">
-                      {canEdit(u) && (
+                      {canEditUser(u) && (
                         <Tooltip label={t('common.edit')}>
                           <ActionIcon variant="subtle" onClick={() => openEdit(u)}>
                             <IconPencil size={16} />
@@ -518,12 +519,48 @@ export default function Settings() {
           <Select
             size="md"
             label={t('users.role')}
+            description={t('users.roleHint')}
             value={role}
             onChange={(v) => v && setRole(v)}
             data={roleOptions()}
             allowDeselect={false}
-            disabled={editing && !isOwner && editing.role === 'admin'}
+            disabled={!isOwner}
           />
+          {isOwner && (
+            <Stack gap="xs">
+              <Group justify="space-between" align="center">
+                <Text size="sm" fw={600}>{t('permissions.title')}</Text>
+                <Group gap="xs">
+                  <Button size="compact-xs" variant="light" onClick={() => setPermissions(PRESETS.admin)}>
+                    {t('permissions.presetAdmin')}
+                  </Button>
+                  <Button size="compact-xs" variant="light" color="gray" onClick={() => setPermissions(PRESETS.staff)}>
+                    {t('permissions.presetStaff')}
+                  </Button>
+                </Group>
+              </Group>
+              <Checkbox.Group value={permissions} onChange={setPermissions}>
+                <Stack gap="sm">
+                  {CAPABILITY_GROUPS.map((g) => (
+                    <div key={g.group}>
+                      <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>
+                        {t(`permissions.group.${g.group}`)}
+                      </Text>
+                      <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="xs" verticalSpacing="xs">
+                        {g.caps.map((capKey) => (
+                          <Checkbox
+                            key={capKey}
+                            value={capKey}
+                            label={t(`permissions.caps.${capKey.replaceAll('.', '_')}`)}
+                          />
+                        ))}
+                      </SimpleGrid>
+                    </div>
+                  ))}
+                </Stack>
+              </Checkbox.Group>
+            </Stack>
+          )}
           {!editing && (
             <Text size="sm" c="dimmed">{t('users.newUserHint')}</Text>
           )}

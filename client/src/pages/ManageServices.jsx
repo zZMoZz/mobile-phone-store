@@ -116,6 +116,7 @@ export default function ManageServices() {
       name_en: '',
       name_ar: '',
       fields: [],
+      direction: 'in',
     },
     validate: {
       name_en: (v) => (v.trim() ? null : t('lists.nameRequired')),
@@ -154,7 +155,7 @@ export default function ManageServices() {
       option_list_id: f.option_list_id ?? null,
       options: f.options ?? [],
     }));
-    form.setValues({ name_en: svc.name_en, name_ar: svc.name_ar, fields });
+    form.setValues({ name_en: svc.name_en, name_ar: svc.name_ar, fields, direction: svc.direction ?? 'in' });
     handlers.open();
   };
 
@@ -213,7 +214,7 @@ export default function ManageServices() {
         return { ...rest, options: f.options || [] };
       });
 
-      const payload = { name_en: values.name_en, name_ar: values.name_ar, fields };
+      const payload = { name_en: values.name_en, name_ar: values.name_ar, fields, direction: values.direction };
 
       if (editing) await updateService(editing.id, payload);
       else await createService(payload);
@@ -621,6 +622,16 @@ export default function ManageServices() {
             required
             dir="auto"
             {...form.getInputProps('name_ar')}
+            mb="sm"
+          />
+          <Select
+            label={t('manageServices.direction')}
+            data={[
+              { value: 'in', label: t('manageServices.directionIn') },
+              { value: 'out', label: t('manageServices.directionOut') },
+            ]}
+            allowDeselect={false}
+            {...form.getInputProps('direction')}
             mb="md"
           />
 

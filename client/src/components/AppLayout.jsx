@@ -17,11 +17,12 @@ import {
   Avatar,
   UnstyledButton,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import {
   IconLayoutDashboard,
   IconBox,
   IconShoppingCartPlus,
+  IconReceipt,
   IconTags,
   IconSettings,
   IconSun,
@@ -112,11 +113,16 @@ export default function AppLayout({ children }) {
   const { storeName } = useSettings();
   const location = useLocation();
   const { dir } = useDirection();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
 
   // Mobile: full show/hide. Desktop: shrink to an icon-only rail (persisted).
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
+
+  // The icon-only mini rail is a desktop affordance. On mobile (below the navbar
+  // breakpoint) the navbar is a full-width drawer, so always show labels there.
+  const isDesktop = useMediaQuery('(min-width: 48em)', true, { getInitialValueInEffect: false });
+  const miniSidebar = collapsed && isDesktop;
 
   const toggleCollapsed = () =>
     setCollapsed((c) => {
@@ -131,21 +137,26 @@ export default function AppLayout({ children }) {
 
   const tooltipSide = dir === 'rtl' ? 'left' : 'right';
 
+  // Only show a nav item when the user holds a capability that page exposes.
+  const canTransact =
+    can('txn.sale') || can('txn.service') || can('txn.expense') || can('txn.return');
+  const canSettings = can('settings.manage') || can('data.backup') || can('users.manage');
   const navItems = [
-    { to: '/', key: 'dashboard', icon: IconLayoutDashboard, end: true },
-    { to: '/inventory', key: 'inventory', icon: IconBox },
-    { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus },
-    { to: '/services/manage', key: 'services', icon: IconTool },
-    { to: '/lists', key: 'lists', icon: IconTags },
-    { to: '/activity-log', key: 'activityLog', icon: IconHistory },
-    { to: '/settings', key: 'settings', icon: IconSettings },
-  ];
+    { to: '/', key: 'dashboard', icon: IconLayoutDashboard, end: true, show: true },
+    { to: '/inventory', key: 'inventory', icon: IconBox, show: can('inventory.view') },
+    { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus, show: canTransact },
+    { to: '/transactions', key: 'transactions', icon: IconReceipt, show: canTransact },
+    { to: '/services/manage', key: 'services', icon: IconTool, show: can('services.manage') },
+    { to: '/lists', key: 'lists', icon: IconTags, show: can('lists.manage') },
+    { to: '/activity-log', key: 'activityLog', icon: IconHistory, show: can('see.activity_log') },
+    { to: '/settings', key: 'settings', icon: IconSettings, show: canSettings },
+  ].filter((item) => item.show);
 
   return (
     <AppShell
       header={{ height: 60 }}
       navbar={{
-        width: collapsed ? 72 : 240,
+        width: miniSidebar ? 72 : 240,
         breakpoint: 'sm',
         collapsed: { mobile: !mobileOpened },
       }}
@@ -162,7 +173,7 @@ export default function AppLayout({ children }) {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p={collapsed ? 'xs' : 'sm'}>
+      <AppShell.Navbar p={miniSidebar ? 'xs' : 'sm'}>
         <AppShell.Section grow>
           {navItems.map(({ to, key, icon: Icon, end }) => {
             const active = end ? location.pathname === to : location.pathname.startsWith(to);
@@ -170,18 +181,18 @@ export default function AppLayout({ children }) {
               <NavLink
                 component={RouterNavLink}
                 to={to}
-                label={collapsed ? undefined : t(`nav.${key}`)}
+                label={miniSidebar ? undefined : t(`nav.${key}`)}
                 leftSection={<Icon size={20} />}
                 active={active}
                 variant={active ? 'filled' : 'subtle'}
                 styles={
-                  collapsed
+                  miniSidebar
                     ? { section: { marginInlineEnd: 0 }, body: { display: 'none' }, root: { justifyContent: 'center' } }
                     : { label: { fontWeight: 700 } }
                 }
               />
             );
-            return collapsed ? (
+            return miniSidebar ? (
               <Tooltip key={to} label={t(`nav.${key}`)} position={tooltipSide} withArrow>
                 {link}
               </Tooltip>
@@ -196,23 +207,23 @@ export default function AppLayout({ children }) {
           {(() => {
             const toggleLink = (
               <NavLink
-                label={collapsed ? undefined : t('common.collapse')}
+                label={miniSidebar ? undefined : t('common.collapse')}
                 onClick={toggleCollapsed}
                 leftSection={
-                  collapsed ? (
+                  miniSidebar ? (
                     <IconLayoutSidebarLeftExpand size={20} />
                   ) : (
                     <IconLayoutSidebarLeftCollapse size={20} />
                   )
                 }
                 styles={
-                  collapsed
+                  miniSidebar
                     ? { section: { marginInlineEnd: 0 }, body: { display: 'none' }, root: { justifyContent: 'center' } }
                     : { label: { fontWeight: 700 } }
                 }
               />
             );
-            return collapsed ? (
+            return miniSidebar ? (
               <Tooltip label={t('common.expand')} position={tooltipSide} withArrow>
                 {toggleLink}
               </Tooltip>

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Title,
   Stack,
   Group,
   SegmentedControl,
   Paper,
-  Box,
   Table,
   NumberInput,
   TextInput,
@@ -16,7 +16,6 @@ import {
   Center,
   Divider,
   Textarea,
-  Select,
   Pagination,
   Modal,
   ScrollArea,
@@ -29,30 +28,12 @@ import { useTranslation } from 'react-i18next';
 import ProductSearchInput from '../components/ProductSearchInput.jsx';
 import { lookupByBarcode, searchProducts } from '../api/products.js';
 import { listTransactions, getTransaction, createTransaction } from '../api/transactions.js';
-import { listUsers } from '../api/users.js';
 import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
 import ServiceRecorder from '../components/ServiceRecorder.jsx';
 import ExpenseRecorder from '../components/ExpenseRecorder.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const PAGE_SIZE = 20;
 const MAX_SHOWN = 2;
-const typeColor = (type) => {
-  if (type === 'sale') return 'blue';
-  if (type === 'purchase') return 'teal';
-  if (type === 'return') return 'orange';
-  if (type === 'expense') return 'red';
-  return 'grape';
-};
-
-// Reads an expense row's label out of its service_data JSON (string in list rows,
-// already-parsed object in detail rows).
-function expenseLabel(txn) {
-  const data = typeof txn.service_data === 'string'
-    ? (() => { try { return JSON.parse(txn.service_data); } catch { return null; } })()
-    : txn.service_data;
-  return data?.label || '';
-}
 
 const nextKey = () => `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -92,11 +73,18 @@ function quickRange(preset) {
 export default function NewTransaction() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canSale = can('txn.sale');
+  const canReturn = can('txn.return');
+  const canExpense = can('txn.expense');
+  const canService = can('txn.service');
   const { colorScheme } = useMantineColorScheme();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // --- New transaction form ---
-  const [type, setType] = useState(() => loadDraft()?.type ?? 'sale');
+  const [type, setType] = useState(() => loadDraft()?.type ?? (can('txn.sale') ? 'sale' : 'return'));
+  const expenseRef = useRef(null);
   const [linesByType, setLinesByType] = useState(() => {
     const draft = loadDraft();
     const restore = (arr) => (arr ?? []).map((l) => ({ ...l, key: nextKey() }));
@@ -119,19 +107,40 @@ export default function NewTransaction() {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ type, linesByType, note }));
   }, [type, linesByType, note]);
 
-  // --- Transaction history ---
-  const [filterType, setFilterType] = useState(null);
-  const [filterUser, setFilterUser] = useState(null);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [quickPeriod, setQuickPeriod] = useState(null);
-  const [page, setPage] = useState(1);
-  const [historyData, setHistoryData] = useState({ items: [], total: 0 });
-  const [refresh, setRefresh] = useState(0);
-  const [users, setUsers] = useState([]);
-
-  const [detail, setDetail] = useState(null);
-  const [opened, handlers] = useDisclosure(false);
+  // Arriving from a product's "Sell" button: pre-add it to a sale (quantity 1),
+  // appending to any in-progress draft. The ref guard keeps it one-shot even if
+  // the effect runs twice (React StrictMode double-invokes effects in dev).
+  const sellConsumed = useRef(false);
+  useEffect(() => {
+    const p = location.state?.addProduct;
+    if (!p || sellConsumed.current) return;
+    sellConsumed.current = true;
+    setType('sale');
+    setLinesByType((prev) => {
+      const sale = prev.sale;
+      const existing = sale.find((l) => l.product_id === p.id);
+      const nextSale = existing
+        ? sale.map((l) =>
+            l.product_id === p.id ? { ...l, quantity: (Number(l.quantity) || 0) + 1 } : l,
+          )
+        : [
+            ...sale,
+            {
+              key: nextKey(),
+              product_id: p.id,
+              name: p.name,
+              barcode: p.barcode,
+              quantity: 1,
+              unit_price: p.selling_price,
+              unit_cost: p.buying_price,
+              stock: p.quantity,
+              locked: true,
+            },
+          ];
+      return { ...prev, sale: nextSale };
+    });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
 
   const [searchResults, setSearchResults] = useState([]);
   const [pickerOpened, pickerHandlers] = useDisclosure(false);
@@ -144,78 +153,56 @@ export default function NewTransaction() {
   const [saleQuick, setSaleQuick] = useState(null);
 
   const barcodeRef = useRef(null);
-  const anyModalOpen = opened || pickerOpened || salePickerOpened;
+  const anyModalOpen = pickerOpened || salePickerOpened;
   const anyModalOpenRef = useRef(anyModalOpen);
   anyModalOpenRef.current = anyModalOpen;
-  const detailPending = useRef(false);
 
   useEffect(() => {
-    barcodeRef.current?.focus();
+    barcodeRef.current?.focus({ preventScroll: true });
   }, []);
 
+  // Refocus when focus drops to idle (Tab away, programmatic blur)
   useEffect(() => {
     const refocusIfIdle = () => {
       setTimeout(() => {
-        if (anyModalOpenRef.current || detailPending.current) return;
+        if (anyModalOpenRef.current) return;
         const active = document.activeElement;
         if (!active || active === document.body) {
-          barcodeRef.current?.focus();
+          barcodeRef.current?.focus({ preventScroll: true });
         }
-      }, 50);
+      }, 0);
     };
     document.addEventListener('focusout', refocusIfIdle);
     return () => document.removeEventListener('focusout', refocusIfIdle);
   }, []);
 
+  // Refocus when clicking any non-input element (buttons, theme toggle, language selector, etc.)
+  useEffect(() => {
+    const handleMouseDown = (e) => {
+      if (anyModalOpenRef.current) return;
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+      if (e.target.closest('[data-barcode-dropdown]')) return;
+      setTimeout(() => barcodeRef.current?.focus({ preventScroll: true }), 0);
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
   const prevModalOpen = useRef(anyModalOpen);
   useEffect(() => {
     if (prevModalOpen.current && !anyModalOpen) {
-      setTimeout(() => barcodeRef.current?.focus(), 0);
+      setTimeout(() => barcodeRef.current?.focus({ preventScroll: true }), 0);
     }
     prevModalOpen.current = anyModalOpen;
   }, [anyModalOpen]);
 
-  // Load users list for the username filter (admin only)
+  // Switching record mode (sale ↔ return) leaves focus on the segmented control;
+  // pull it back to the scanner so wedge input keeps working.
   useEffect(() => {
-    if (isAdmin) {
-      listUsers().then(setUsers).catch(() => {});
-    }
-  }, [isAdmin]);
-
-  const historyQuery = useMemo(
-    () => ({
-      type: filterType || undefined,
-      username: filterUser || undefined,
-      from: from || undefined,
-      to: to ? `${to} 23:59:59` : undefined,
-      page,
-      pageSize: PAGE_SIZE,
-    }),
-    [filterType, filterUser, from, to, page],
-  );
-
-  useEffect(() => {
-    listTransactions(historyQuery).then(setHistoryData).catch(() => {});
-  }, [historyQuery, refresh]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filterType, filterUser, from, to]);
-
-  const applyQuickPeriod = (preset) => {
-    const { from: f, to: tt } = quickRange(preset);
-    setFrom(f);
-    setTo(tt);
-    setQuickPeriod(preset);
-  };
-
-  const clearFilters = () => {
-    setFilterType(null);
-    setFilterUser(null);
-    setFrom('');
-    setTo('');
-    setQuickPeriod(null);
-  };
+    if (anyModalOpenRef.current) return;
+    setTimeout(() => barcodeRef.current?.focus({ preventScroll: true }), 0);
+  }, [type]);
 
   useEffect(() => {
     if (!salePickerOpened) return;
@@ -251,18 +238,6 @@ export default function NewTransaction() {
       notifications.show({ message: t('common.error'), color: 'red' });
     }
   };
-
-  const openDetail = async (id) => {
-    try {
-      const txn = await getTransaction(id);
-      setDetail(txn);
-      handlers.open();
-    } finally {
-      detailPending.current = false;
-    }
-  };
-
-  const totalPages = Math.max(1, Math.ceil(historyData.total / PAGE_SIZE));
 
   // --- Form logic ---
   // purchase uses buying_price; sale and return both use selling_price
@@ -355,8 +330,6 @@ export default function NewTransaction() {
       notifications.show({ message: t('newTxn.recorded'), color: 'green' });
       setLines([]);
       setNote('');
-      setPage(1);
-      setRefresh((r) => r + 1);
     } catch (err) {
       notifications.show({ message: err.response?.data?.error || t('common.error'), color: 'red' });
     } finally {
@@ -364,33 +337,43 @@ export default function NewTransaction() {
     }
   };
 
-  const headerBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-1)';
-  const headerBorder = colorScheme === 'dark' ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)';
-
-  const userSelectData = users.map((u) => ({
-    value: u.username,
-    label: u.display_name ? `${u.display_name} (${u.username})` : u.username,
-  }));
+  // Recording modes the user is allowed to use (product-line recorder + expense modal).
+  const lineTypeOptions = [
+    canSale && { value: 'sale', label: t('txnType.sale') },
+    canReturn && { value: 'return', label: t('txnType.return') },
+    canExpense && { value: 'expense', label: t('txnType.expense') },
+  ].filter(Boolean);
 
   return (
     <Stack>
       <Title order={2}>{t('newTxn.title')}</Title>
 
-      <ServiceRecorder />
+      {canService && <ServiceRecorder />}
 
-      <ExpenseRecorder />
+      {canExpense && (
+        <ExpenseRecorder
+          ref={expenseRef}
+          hideButton
+          onClosed={() => {
+            if (anyModalOpenRef.current) return;
+            setTimeout(() => barcodeRef.current?.focus({ preventScroll: true }), 0);
+          }}
+        />
+      )}
 
+      {(canSale || canReturn) && (
       <Paper withBorder p="md" radius="md">
         <SegmentedControl
           fullWidth
           value={type}
           onChange={(v) => {
+            if (v === 'expense') {
+              expenseRef.current?.open();
+              return;
+            }
             setType(v);
           }}
-          data={[
-            { value: 'sale', label: t('txnType.sale') },
-            { value: 'return', label: t('txnType.return') },
-          ]}
+          data={lineTypeOptions}
         />
 
         <Divider my="md" />
@@ -409,15 +392,16 @@ export default function NewTransaction() {
             </Button>
           )}
           {type === 'return' && (
-            <Button variant="light" color="orange" leftSection={<IconSearch size={16} />} onClick={salePickerHandlers.open}>
+            <Button variant="default" leftSection={<IconSearch size={16} />} onClick={salePickerHandlers.open}>
               {t('newTxn.loadFromSale')}
             </Button>
           )}
         </Group>
 
-        <Table verticalSpacing="xs">
+        <ScrollArea type="auto">
+        <Table verticalSpacing="xs" miw={560}>
           <Table.Thead>
-            <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
+            <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'} style={{ whiteSpace: 'nowrap' }}>
               <Table.Th>{t('newTxn.item')}</Table.Th>
               <Table.Th w={110}>{t('newTxn.barcode')}</Table.Th>
               <Table.Th w={90}>{t('newTxn.inStock')}</Table.Th>
@@ -440,6 +424,7 @@ export default function NewTransaction() {
                         placeholder={t('newTxn.newItemName')}
                         value={l.name}
                         onChange={(e) => updateLine(l.key, { name: e.currentTarget.value })}
+                        size="xs"
                       />
                       <NumberInput
                         placeholder={t('newTxn.buyingPrice')}
@@ -470,6 +455,15 @@ export default function NewTransaction() {
                     value={l.quantity}
                     onChange={(v) => updateLine(l.key, { quantity: v })}
                     hideControls
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const row = e.currentTarget.closest('tr');
+                        const inputs = Array.from(row?.querySelectorAll('input') || []);
+                        const idx = inputs.indexOf(e.currentTarget);
+                        if (idx !== -1 && inputs[idx + 1]) inputs[idx + 1].focus();
+                      }
+                    }}
                   />
                 </Table.Td>
                 <Table.Td>
@@ -478,6 +472,12 @@ export default function NewTransaction() {
                     value={l.unit_price}
                     onChange={(v) => updateLine(l.key, { unit_price: v })}
                     hideControls
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        barcodeRef.current?.focus({ preventScroll: true });
+                      }
+                    }}
                   />
                 </Table.Td>
                 {type === 'sale' && (
@@ -506,6 +506,7 @@ export default function NewTransaction() {
             )}
           </Table.Tbody>
         </Table>
+        </ScrollArea>
 
         <Divider mb="md" />
 
@@ -533,152 +534,7 @@ export default function NewTransaction() {
           </Button>
         </Group>
       </Paper>
-
-      {/* ── Transaction history ─────────────────────────────── */}
-      <Divider mt="md" />
-      <Paper withBorder radius="md" p={0}>
-        {/* Header bar: title + quick period buttons */}
-        <Box
-          px="md"
-          py="xs"
-          style={{
-            backgroundColor: headerBg,
-            borderBottom: `1px solid ${headerBorder}`,
-            borderRadius: 'var(--mantine-radius-md) var(--mantine-radius-md) 0 0',
-          }}
-        >
-          <Group justify="space-between">
-            <Text fw={700} size="sm">{t('txns.title')}</Text>
-            <Group gap="xs">
-              {['today', 'week', 'month', 'year'].map((preset) => (
-                <Button
-                  key={preset}
-                  size="xs"
-                  variant={quickPeriod === preset ? 'filled' : 'default'}
-                  onClick={() => applyQuickPeriod(preset)}
-                >
-                  {t(`txns.quick${preset.charAt(0).toUpperCase()}${preset.slice(1)}`)}
-                </Button>
-              ))}
-            </Group>
-          </Group>
-        </Box>
-
-        {/* Filter row */}
-        <Group px="md" py="xs" gap="sm" align="flex-end" wrap="wrap">
-          <Select
-            size="xs"
-            label={t('txns.filterType')}
-            placeholder={t('common.all')}
-            data={[
-              { value: 'sale', label: t('txnType.sale') },
-              { value: 'purchase', label: t('txnType.purchase') },
-              { value: 'service', label: t('txnType.service') },
-              { value: 'return', label: t('txnType.return') },
-              { value: 'expense', label: t('txnType.expense') },
-            ]}
-            value={filterType}
-            onChange={setFilterType}
-            clearable
-            w={120}
-          />
-          {isAdmin && (
-            <Select
-              size="xs"
-              label={t('txns.filterUser')}
-              placeholder={t('common.all')}
-              data={userSelectData}
-              value={filterUser}
-              onChange={setFilterUser}
-              clearable
-              searchable
-              w={150}
-            />
-          )}
-          <TextInput
-            size="xs"
-            label={t('txns.from')}
-            type="date"
-            value={from}
-            onChange={(e) => { setFrom(e.currentTarget.value); setQuickPeriod(null); }}
-            w={140}
-          />
-          <TextInput
-            size="xs"
-            label={t('txns.to')}
-            type="date"
-            value={to}
-            onChange={(e) => { setTo(e.currentTarget.value); setQuickPeriod(null); }}
-            w={140}
-          />
-          <Button size="xs" variant="default" onClick={clearFilters} style={{ alignSelf: 'flex-end' }}>
-            {t('txns.clearFilters')}
-          </Button>
-        </Group>
-
-        {/* Table */}
-        <ScrollArea>
-          <Table highlightOnHover verticalSpacing="xs" fz="xs" miw={760}>
-            <Table.Thead style={{ backgroundColor: colorScheme === 'dark' ? 'var(--mantine-color-dark-5)' : 'var(--mantine-color-gray-2)' }}>
-              <Table.Tr>
-                <Table.Th>{t('txns.date')}</Table.Th>
-                <Table.Th>{t('newTxn.type')}</Table.Th>
-                <Table.Th>{t('txns.items')}</Table.Th>
-                <Table.Th w={40}>{t('txns.itemCount')}</Table.Th>
-                <Table.Th>{t('txns.total')}</Table.Th>
-                <Table.Th>{t('txns.profit')}</Table.Th>
-                <Table.Th>{t('txns.user')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {historyData.items.map((txn) => (
-                <Table.Tr
-                  key={txn.id}
-                  style={{ cursor: 'pointer' }}
-                  onMouseDown={() => { detailPending.current = true; }}
-                  onClick={() => openDetail(txn.id)}
-                >
-                  <Table.Td>{formatDate(txn.created_at, lang)}</Table.Td>
-                  <Table.Td>
-                    <Badge size="sm" variant="light" color={typeColor(txn.type)}>
-                      {t(`txnType.${txn.type}`)}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs" lineClamp={1}>
-                      {txn.type === 'expense' ? (expenseLabel(txn) || '—') : itemSummary(txn.items)}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs">{formatNumber(txn.items?.length ?? 0, lang)}</Text>
-                  </Table.Td>
-                  <Table.Td>{formatMoney(txn.total, lang)}</Table.Td>
-                  <Table.Td>
-                    {(txn.type === 'purchase' || txn.type === 'return' || txn.type === 'expense') ? '—' : formatMoney(txn.profit, lang)}
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs" c="dimmed">{txn.username_snapshot || '—'}</Text>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-              {historyData.items.length === 0 && (
-                <Table.Tr>
-                  <Table.Td colSpan={7}>
-                    <Center p="lg">
-                      <Text c="dimmed">{t('common.noResults')}</Text>
-                    </Center>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
-        </ScrollArea>
-
-        {/* Pagination */}
-        <Group justify="flex-end" px="md" py="sm">
-          <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
-        </Group>
-      </Paper>
+      )}
 
       {/* Product picker modal */}
       <Modal opened={pickerOpened} onClose={pickerHandlers.close} title={t('newTxn.selectProduct')} size="sm">
@@ -700,66 +556,6 @@ export default function NewTransaction() {
             </Button>
           ))}
         </Stack>
-      </Modal>
-
-      {/* Transaction detail modal */}
-      <Modal opened={opened} onClose={handlers.close} title={t('txns.details')} size="lg">
-        {detail && (
-          <Stack>
-            <Group>
-              <Badge variant="light" color={typeColor(detail.type)}>
-                {t(`txnType.${detail.type}`)}
-              </Badge>
-              <Text c="dimmed">{formatDate(detail.created_at, lang)}</Text>
-              {detail.username_snapshot && (
-                <Text size="sm" c="dimmed">{detail.username_snapshot}</Text>
-              )}
-            </Group>
-            {detail.type === 'expense' ? (
-              <Text fw={600}>{expenseLabel(detail) || '—'}</Text>
-            ) : (
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('newTxn.item')}</Table.Th>
-                    <Table.Th>{t('newTxn.quantity')}</Table.Th>
-                    <Table.Th>{t('newTxn.unitPrice')}</Table.Th>
-                    <Table.Th>{t('newTxn.lineTotal')}</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {detail.items.map((it) => (
-                    <Table.Tr key={it.id}>
-                      <Table.Td>{it.name_snapshot}</Table.Td>
-                      <Table.Td>{formatNumber(it.quantity, lang)}</Table.Td>
-                      <Table.Td>{formatMoney(it.unit_price, lang)}</Table.Td>
-                      <Table.Td>{formatMoney(it.line_total, lang)}</Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            )}
-            <Divider />
-            <Group justify="space-between">
-              <Stack gap={2}>
-                {detail.type === 'service' && (
-                  <Text size="sm" c="dimmed">
-                    {t('newTxn.fee')}: {formatMoney(detail.fee, lang)}
-                  </Text>
-                )}
-                <Text fw={700}>
-                  {t('newTxn.total')}: {formatMoney(detail.total, lang)}
-                </Text>
-              </Stack>
-              {detail.type !== 'purchase' && detail.type !== 'return' && detail.type !== 'expense' && (
-                <Badge color="teal" variant="light" size="lg">
-                  {t('newTxn.profit')}: {formatMoney(detail.profit, lang)}
-                </Badge>
-              )}
-            </Group>
-            {detail.note && <Text c="dimmed">{detail.note}</Text>}
-          </Stack>
-        )}
       </Modal>
 
       {/* Sale-picker modal for returns */}

@@ -4,8 +4,8 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "inventory": "Inventory",
-    "newTransaction": "Manage Transactions",
+    "inventory": "Manage Inventory",
+    "newTransaction": "Creating Transaction",
     "transactions": "Transactions",
     "services": "Manage Services",
     "lists": "Categories & Brands",
@@ -75,7 +75,7 @@
     "expand": "Expand Sidebar"
   },
   "inventory": {
-    "title": "Inventory",
+    "title": "Manage Inventory",
     "addProduct": "Add Product",
     "addStock": "Add Stock (Scan)",
     "addModal": {
@@ -86,7 +86,8 @@
       "quantityToAdd": "Quantity to add",
       "costPerUnit": "Cost per unit",
       "costPerUnitHint": "Defaults to the current cost; change it if this batch cost differs",
-      "currentStock": "Current stock"
+      "currentStock": "Current stock",
+      "quantityRequired": "Enter a quantity of at least 1"
     },
     "scanPrompt": "Scan or type a barcode and press Enter",
     "searchPlaceholder": "Search by name or barcode",
@@ -94,6 +95,7 @@
     "priceRange": "Selling Price Range",
     "minPrice": "Min Price",
     "maxPrice": "Max Price",
+    "priceFilterNote": "By selling price",
     "minQty": "Min Quantity",
     "maxQty": "Max Quantity",
     "inStockOnly": "In Stock Only",
@@ -126,13 +128,23 @@
       "updatedAt": "Last Modified"
     },
     "stockAdded": "Stock updated",
+    "deleteTitle": "Delete product",
     "deleteConfirm": "Delete this product?",
-    "period": {
-      "label": "Added",
-      "all": "All Time",
-      "today": "Today",
-      "week": "This Week",
-      "month": "This Month"
+    "bulk": {
+      "selectAllMatching": "Select all {{count}} matching",
+      "selectedCount": "{{count}} selected",
+      "clear": "Clear",
+      "delete": "Delete",
+      "edit": "Edit category / brand",
+      "deleteTitle": "Delete selected products",
+      "deleteConfirm": "Delete {{count}} selected products? This cannot be undone.",
+      "hasStockWarning": "{{count}} of these still have stock ({{units}} units). Deleting them will remove that stock from inventory.",
+      "deleted": "{{count}} products deleted",
+      "editTitle": "Edit selected products",
+      "editHint": "Leave a field unchanged to keep it as-is. Choose \"Clear\" to remove the value.",
+      "keepUnchanged": "Keep unchanged",
+      "apply": "Apply",
+      "updated": "{{count}} products updated"
     }
   },
   "product": {
@@ -155,8 +167,15 @@
     "categoryRequired": "Category is required",
     "brandRequired": "Brand is required",
     "details": "Product Details",
+    "sell": "Sell",
     "history": "Transaction History",
     "noHistory": "No transactions yet",
+    "date": "Date",
+    "txnId": "ID",
+    "action": "Action",
+    "unitPrice": "Unit Price",
+    "profit": "Profit",
+    "user": "User",
     "temporary": "Temporary Item"
   },
   "txnType": {
@@ -178,7 +197,7 @@
     "amountRequired": "Amount must be greater than 0"
   },
   "newTxn": {
-    "title": "Manage Transactions",
+    "title": "Creating Transaction",
     "type": "Type",
     "scanToAdd": "Scan barcode or type product name, then Enter",
     "manualAdd": "Add Unlisted Item",
@@ -230,7 +249,15 @@
     "quickWeek": "This Week",
     "quickMonth": "This Month",
     "quickYear": "This Year",
-    "clearFilters": "Clear"
+    "clearFilters": "Clear",
+    "txnId": "No.",
+    "filterService": "Service",
+    "filterDirection": "Direction",
+    "directionIn": "Money In",
+    "directionOut": "Money Out",
+    "statTotal": "Total",
+    "statProfit": "Profit",
+    "statCost": "Total Without Profit"
   },
   "services": {
     "title": "Services",
@@ -239,6 +266,8 @@
     "manage": "Manage services",
     "recordTitle": "Record service",
     "cost": "Amount Received",
+    "costIn": "Amount Received",
+    "costOut": "Amount Paid",
     "profit": "Profit",
     "recordWithoutShortcut": "Record without shortcut",
     "recorded": "Service recorded",
@@ -290,7 +319,8 @@
     "optlist_name_en_duplicate": "This name is already used by another list",
     "optlist_name_ar_duplicate": "This name is already used by another list",
     "optlist_option_dup_en": "Duplicate English option name",
-    "optlist_option_dup_ar": "Duplicate Arabic option name"
+    "optlist_option_dup_ar": "Duplicate Arabic option name",
+    "insufficient_stock": "Not enough stock for \"{{name}}\": {{available}} available, {{requested}} requested"
   },
   "lists": {
     "title": "Categories & Brands",
@@ -385,7 +415,10 @@
     "deleteShortcutConfirm": "Delete this shortcut?",
     "presetsCount": "{{count}} presets",
     "allServices": "All Services",
-    "searchShortcuts": "Search shortcuts..."
+    "searchShortcuts": "Search shortcuts...",
+    "direction": "Direction",
+    "directionIn": "Money In (you receive)",
+    "directionOut": "Money Out (you pay)"
   },
   "users": {
     "title": "Users",
@@ -416,7 +449,33 @@
     "tempPassword": "Temporary Password",
     "tempPasswordHint": "The user will be required to change this on next login.",
     "status": "Status",
+    "roleHint": "A starting preset. Fine-tune exact access below.",
     "newUserHint": "The user will be asked to set their own password on first login."
+  },
+  "permissions": {
+    "title": "Permissions",
+    "presetAdmin": "Admin preset",
+    "presetStaff": "Staff preset",
+    "group": {
+      "see": "Can see",
+      "do": "Can do"
+    },
+    "caps": {
+      "see_cost": "Cost & profit/margin",
+      "see_others_transactions": "Other users' transactions",
+      "see_activity_log": "Activity log",
+      "txn_sale": "Record sales",
+      "txn_service": "Record services",
+      "txn_expense": "Record expenses",
+      "txn_return": "Process returns/voids",
+      "inventory_view": "View inventory",
+      "inventory_edit": "Add/edit inventory",
+      "services_manage": "Manage services catalog",
+      "lists_manage": "Manage categories & lists",
+      "settings_manage": "Manage app settings",
+      "data_backup": "Backup & export data",
+      "users_manage": "Manage users"
+    }
   },
   "activityLog": {
     "title": "Activity Log",

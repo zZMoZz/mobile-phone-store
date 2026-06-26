@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Stack,
   Group,
@@ -19,7 +19,9 @@ import { apiErrorMessage } from '../lib/apiError.js';
 // Records an "expense": money out that isn't inventory (e.g. shop rent). Productless —
 // just a label + amount + optional note. Sibling to ServiceRecorder; both are simple
 // productless recorders shown above the items-based transaction form.
-export default function ExpenseRecorder() {
+// `hideButton` renders only the modal; the parent triggers it via the imperative
+// `open()` handle (used so an "expense" segment can sit inside the type toggle).
+const ExpenseRecorder = forwardRef(function ExpenseRecorder({ hideButton = false, onClosed } = {}, ref) {
   const { t } = useTranslation();
 
   const [opened, { open, close }] = useDisclosure(false);
@@ -58,6 +60,16 @@ export default function ExpenseRecorder() {
     open();
   };
 
+  useImperativeHandle(ref, () => ({ open: openModal }), []);
+
+  // Notify the parent whenever the modal closes (save, cancel, Escape, overlay)
+  // so it can restore scanner focus.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !opened) onClosed?.();
+    wasOpen.current = opened;
+  }, [opened, onClosed]);
+
   const handleSave = async () => {
     const labelTrimmed = label.trim();
     if (!labelTrimmed) {
@@ -93,6 +105,7 @@ export default function ExpenseRecorder() {
 
   return (
     <>
+      {!hideButton && (
       <Group gap="sm" wrap="wrap">
         <Card
           withBorder
@@ -112,8 +125,11 @@ export default function ExpenseRecorder() {
           </Button>
         </Card>
       </Group>
+      )}
 
-      <Modal opened={opened} onClose={close} title={t('expense.recordTitle')} size="md">
+      {/* returnFocus off: the parent refocuses the barcode scanner on close, so we
+          must not restore focus to the segmented-control trigger and fight it. */}
+      <Modal opened={opened} onClose={close} title={t('expense.recordTitle')} size="md" returnFocus={false}>
         <Stack gap="md">
           <Autocomplete
             label={t('expense.label')}
@@ -122,7 +138,6 @@ export default function ExpenseRecorder() {
             value={label}
             onChange={setLabel}
             required
-            data-autofocus
           />
 
           <NumberInput
@@ -153,4 +168,6 @@ export default function ExpenseRecorder() {
       </Modal>
     </>
   );
-}
+});
+
+export default ExpenseRecorder;

@@ -23,6 +23,7 @@ export function authenticate(req, res, next) {
       username: user.username,
       display_name: user.display_name,
       role: user.role,
+      permissions: user.permissions ?? [],
       force_password_change: user.force_password_change,
     };
     next();

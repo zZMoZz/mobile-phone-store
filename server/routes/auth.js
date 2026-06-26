@@ -26,11 +26,16 @@ function makeUserToken(user, tv) {
 }
 
 function safeUser(user) {
+  let permissions = user.permissions ?? [];
+  if (typeof permissions === 'string') {
+    try { permissions = JSON.parse(permissions); } catch { permissions = []; }
+  }
   return {
     id: user.id,
     username: user.username,
     display_name: user.display_name,
     role: user.role,
+    permissions: Array.isArray(permissions) ? permissions : [],
     force_password_change: user.force_password_change === 1,
   };
 }
@@ -75,6 +80,7 @@ router.get('/me', authenticate, (req, res) => {
     username: req.user.username,
     display_name: req.user.display_name,
     role: req.user.role,
+    permissions: req.user.permissions ?? [],
     force_password_change: req.user.force_password_change === 1,
   });
 });

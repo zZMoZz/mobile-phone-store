@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Inventory from './pages/Inventory.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import NewTransaction from './pages/NewTransaction.jsx';
+import Transactions from './pages/Transactions.jsx';
 import ManageLists from './pages/ManageLists.jsx';
 import ManageServices from './pages/ManageServices.jsx';
 import Settings from './pages/Settings.jsx';
@@ -43,13 +44,14 @@ export default function App() {
                 <AppLayout>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/inventory/:id" element={<ProductDetail />} />
+                    <Route path="/inventory" element={<ProtectedRoute requiredCap="inventory.view"><Inventory /></ProtectedRoute>} />
+                    <Route path="/inventory/:id" element={<ProtectedRoute requiredCap="inventory.view"><ProductDetail /></ProtectedRoute>} />
                     <Route path="/new-transaction" element={<NewTransaction />} />
-                    <Route path="/services/manage" element={<ManageServices />} />
-                    <Route path="/lists" element={<ManageLists />} />
+                    <Route path="/transactions" element={<Transactions />} />
+                    <Route path="/services/manage" element={<ProtectedRoute requiredCap="services.manage"><ManageServices /></ProtectedRoute>} />
+                    <Route path="/lists" element={<ProtectedRoute requiredCap="lists.manage"><ManageLists /></ProtectedRoute>} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="/activity-log" element={<ActivityLog />} />
+                    <Route path="/activity-log" element={<ProtectedRoute requiredCap="see.activity_log"><ActivityLog /></ProtectedRoute>} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </AppLayout>

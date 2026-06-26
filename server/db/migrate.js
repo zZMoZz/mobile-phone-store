@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { getDb } from './connection.js';
 import { SCHEMA_PATH } from './paths.js';
+import { CAPABILITIES } from '../lib/permissions.js';
 
 /** Applies schema.sql to the database. Idempotent. */
 export function migrate() {
@@ -91,6 +92,23 @@ function applyColumnMigrations(db) {
     db.exec('PRAGMA foreign_keys = ON');
   }
 
+  // Users: per-user capability column (capability model replacing fixed roles).
+  // Backfill existing users so behaviour is preserved: admins get every
+  // capability, staff get exactly what they could already do; the owner is
+  // implicit-all so its value is unused. The owner can tighten afterwards.
+  if (!columns('users').includes('permissions')) {
+    db.exec("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '[]'");
+    const ALL = JSON.stringify(CAPABILITIES);
+    // Staff today: everything except the admin-gated see.cost,
+    // see.others_transactions, settings.manage, data.backup, users.manage.
+    const STAFF = JSON.stringify([
+      'see.activity_log', 'txn.sale', 'txn.service', 'txn.expense', 'txn.return',
+      'inventory.view', 'inventory.edit', 'services.manage', 'lists.manage',
+    ]);
+    db.prepare("UPDATE users SET permissions = ? WHERE role = 'admin'").run(ALL);
+    db.prepare("UPDATE users SET permissions = ? WHERE role = 'staff'").run(STAFF);
+  }
+
   // Migrate option_lists.options from string[] to {name_en, name_ar}[].
   db.prepare('SELECT id, options FROM option_lists').all().forEach(({ id, options }) => {
     const parsed = JSON.parse(options || '[]');
@@ -99,6 +117,12 @@ function applyColumnMigrations(db) {
       db.prepare('UPDATE option_lists SET options = ? WHERE id = ?').run(JSON.stringify(migrated), id);
     }
   });
+
+  // Services: direction flag ('in' = money received, 'out' = money paid out).
+  const servicesCols = columns('services');
+  if (!servicesCols.includes('direction')) {
+    db.exec("ALTER TABLE services ADD COLUMN direction TEXT NOT NULL DEFAULT 'in'");
+  }
 
   // Migrate services.fields inline options from string[] to {name_en, name_ar}[].
   db.prepare('SELECT id, fields FROM services').all().forEach(({ id, fields }) => {

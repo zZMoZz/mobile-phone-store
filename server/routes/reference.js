@@ -1,24 +1,27 @@
 import { Router } from 'express';
 import { categories, brands } from '../repositories/reference.js';
 import { logActivity } from '../repositories/activityLogs.js';
+import { requirePermission } from '../middleware/requirePermission.js';
+
+const canManage = requirePermission('lists.manage');
 
 // Builds an identical CRUD router for a reference repo (categories / brands).
 function makeRouter(repo, { createAction, updateAction, deleteAction }) {
   const router = Router();
   router.get('/', (req, res) => res.json(repo.list()));
-  router.post('/', (req, res) => {
+  router.post('/', canManage, (req, res) => {
     const result = repo.create(req.body);
     logActivity({ userId: req.user.id, username: req.user.username, action: createAction, entity: createAction.replace('create_', ''), entityId: result.id });
     res.status(201).json(result);
   });
-  router.put('/:id', (req, res) => {
+  router.put('/:id', canManage, (req, res) => {
     const id = Number(req.params.id);
     const updated = repo.update(id, req.body);
     if (!updated) return res.status(404).json({ error: 'Not found' });
     logActivity({ userId: req.user.id, username: req.user.username, action: updateAction, entity: updateAction.replace('update_', ''), entityId: id });
     res.json(updated);
   });
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', canManage, (req, res) => {
     // Optional ?moveTo=<id> reassigns products to that record before deleting.
     const moveTo = req.query.moveTo != null && req.query.moveTo !== '' ? Number(req.query.moveTo) : null;
     const id = Number(req.params.id);

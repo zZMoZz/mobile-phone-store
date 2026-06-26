@@ -164,6 +164,68 @@ export function remove(id) {
 }
 
 /**
+ * Deletes many products at once (atomic). transaction_items.product_id is
+ * ON DELETE SET NULL, so historical lines keep their snapshots. Returns the
+ * number of rows actually deleted.
+ */
+export function removeMany(ids) {
+  const list = [...new Set((ids || []).map(Number).filter(Number.isInteger))];
+  if (list.length === 0) return 0;
+  const stmt = getDb().prepare('DELETE FROM products WHERE id = ?');
+  const run = getDb().transaction((rows) => {
+    let n = 0;
+    for (const id of rows) n += stmt.run(id).changes;
+    return n;
+  });
+  return run(list);
+}
+
+/**
+ * Of the given product ids, how many still hold stock and how many total units.
+ * Used to warn before deleting products that still have inventory.
+ */
+export function stockStatus(ids) {
+  const list = [...new Set((ids || []).map(Number).filter(Number.isInteger))];
+  if (list.length === 0) return { inStock: 0, units: 0 };
+  const placeholders = list.map(() => '?').join(',');
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS inStock, COALESCE(SUM(quantity), 0) AS units
+         FROM products WHERE id IN (${placeholders}) AND quantity > 0`,
+    )
+    .get(...list);
+  return { inStock: row.inStock, units: row.units };
+}
+
+/**
+ * Reassigns category and/or brand for many products at once (atomic). Only the
+ * provided fields are changed; omitted fields are left as-is. Returns the count
+ * of products updated.
+ */
+export function setReferences(ids, { category_id, brand_id } = {}) {
+  const list = [...new Set((ids || []).map(Number).filter(Number.isInteger))];
+  const sets = [];
+  const base = {};
+  if (category_id !== undefined) {
+    sets.push('category_id = @category_id');
+    base.category_id = category_id ?? null;
+  }
+  if (brand_id !== undefined) {
+    sets.push('brand_id = @brand_id');
+    base.brand_id = brand_id ?? null;
+  }
+  if (list.length === 0 || sets.length === 0) return 0;
+  sets.push("updated_at = datetime('now')");
+  const stmt = getDb().prepare(`UPDATE products SET ${sets.join(', ')} WHERE id = @id`);
+  const run = getDb().transaction((rows) => {
+    let n = 0;
+    for (const id of rows) n += stmt.run({ ...base, id }).changes;
+    return n;
+  });
+  return run(list);
+}
+
+/**
  * Adjusts a product's quantity by `delta` (can be negative). The single place
  * stock changes — driven only by purchase/sale transactions. Returns the product.
  */
@@ -258,6 +320,19 @@ export function list(query = {}) {
     .all({ ...params, limit: pageSize, offset });
 
   return { items, total, page, pageSize };
+}
+
+/**
+ * Returns the ids of ALL products matching the given filters (no pagination).
+ * Used by the inventory "select all matching" action across pages.
+ */
+export function listIds(query = {}) {
+  const { where, params } = buildProductFilters(query);
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  return getDb()
+    .prepare(`SELECT id FROM products p ${whereSql}`)
+    .all(params)
+    .map((r) => r.id);
 }
 
 /**
