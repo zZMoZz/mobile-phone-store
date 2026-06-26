@@ -11,7 +11,7 @@ export function listByProduct(productId) {
               ti.quantity, ti.unit_price, ti.unit_cost, ti.line_total
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
-       WHERE ti.product_id = ?
+       WHERE ti.product_id = ? AND t.voided_at IS NULL
        ORDER BY t.created_at DESC, t.id DESC`,
     )
     .all(productId);
@@ -26,7 +26,7 @@ const PRODUCT_HISTORY_TYPES = new Set(['sale', 'purchase', 'return']);
  * recorded it. Profit is derived per line on the client (qty * (price - cost)).
  */
 export function historyByProduct(productId, query = {}) {
-  const where = ['ti.product_id = @productId'];
+  const where = ['ti.product_id = @productId', 't.voided_at IS NULL'];
   const params = { productId: Number(productId) };
   if (PRODUCT_HISTORY_TYPES.has(query.type)) {
     where.push('t.type = @type');

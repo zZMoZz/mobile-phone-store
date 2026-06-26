@@ -204,10 +204,16 @@ export default function Transactions() {
     setVoidLoading(true);
     try {
       await voidTransaction(voidTarget.id);
+      const removedId = voidTarget.id;
       closeVoid();
       setVoidTarget(null);
-      // Trigger list refetch by bumping refreshKey (historyQuery depends on it)
-      setRefreshKey((k) => k + 1);
+      // Optimistic removal — spec requirement
+      setHistoryData((prev) => ({
+        ...prev,
+        items: prev.items.filter((t) => t.id !== removedId),
+        total: Math.max(0, prev.total - 1),
+      }));
+      setRefreshKey((k) => k + 1); // background refetch
     } catch (err) {
       const code = err.response?.data?.code;
       const params = err.response?.data?.params;
@@ -513,7 +519,7 @@ export default function Transactions() {
       {/* Void confirmation modal */}
       <Modal
         opened={voidOpened}
-        onClose={closeVoid}
+        onClose={() => { closeVoid(); setVoidError(null); }}
         title={t('txns.void.confirmTitle', { type: voidTarget ? t(`txnType.${voidTarget.type}`) : '' })}
         size="sm"
       >
