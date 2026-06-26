@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as transactions from '../repositories/transactions.js';
 import { logActivity } from '../repositories/activityLogs.js';
 import { userHas } from '../lib/permissions.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 
 const router = Router();
 
@@ -28,6 +29,11 @@ router.get('/:id', (req, res) => {
   const txn = transactions.getById(Number(req.params.id));
   if (!txn) return res.status(404).json({ error: 'Not found' });
   res.json(txn);
+});
+
+router.post('/:id/void', requirePermission('txn.void'), (req, res) => {
+  const result = transactions.voidTransaction(Number(req.params.id), req.user.id);
+  res.json(result);
 });
 
 router.post('/', (req, res) => {

@@ -14,3 +14,8 @@ export async function createTransaction(body) {
   const { data } = await api.post('/transactions', body);
   return data;
 }
+
+export async function voidTransaction(id) {
+  const { data } = await api.post(`/transactions/${id}/void`);
+  return data;
+}
