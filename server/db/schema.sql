@@ -84,7 +84,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   profit          REAL NOT NULL DEFAULT 0,     -- total - cost_total (sale/service)
   user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
   username_snapshot TEXT,
-  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  voided_at       TEXT DEFAULT NULL,
+  voided_by_id    INTEGER REFERENCES users(id) DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);

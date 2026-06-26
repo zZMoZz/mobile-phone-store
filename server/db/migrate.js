@@ -59,6 +59,12 @@ function applyColumnMigrations(db) {
   if (!txnCols.includes('username_snapshot')) {
     db.exec('ALTER TABLE transactions ADD COLUMN username_snapshot TEXT');
   }
+  if (!txnCols.includes('voided_at')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN voided_at TEXT DEFAULT NULL');
+  }
+  if (!txnCols.includes('voided_by_id')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN voided_by_id INTEGER REFERENCES users(id) DEFAULT NULL');
+  }
 
   // Users: full table recreation to add new columns and update role CHECK constraint.
   // Triggered by the absence of token_version (added in the auth overhaul).
