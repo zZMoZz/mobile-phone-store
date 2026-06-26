@@ -1,6 +1,7 @@
 import { getDb } from '../db/connection.js';
 import * as products from './products.js';
 import * as services from './services.js';
+import * as optionLists from './optionLists.js';
 
 /** Transaction history for a single product, most recent first. */
 export function listByProduct(productId) {
@@ -79,16 +80,99 @@ export function getById(id) {
   return { ...txn, items, service_type: serviceType, service_data: serviceData };
 }
 
+export function voidTransaction(id, userId) {
+  const db = getDb();
+
+  const txn = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id);
+  if (!txn) {
+    const err = new Error('Transaction not found');
+    err.status = 404;
+    err.code = 'not_found';
+    throw err;
+  }
+  if (txn.voided_at) {
+    const err = new Error('Transaction already voided');
+    err.status = 400;
+    err.code = 'already_voided';
+    throw err;
+  }
+
+  const { age } = db.prepare("SELECT unixepoch('now') - unixepoch(?) AS age").get(txn.created_at);
+  if (age > 300) {
+    const err = new Error('Void window expired');
+    err.status = 403;
+    err.code = 'window_expired';
+    throw err;
+  }
+
+  const items = db
+    .prepare('SELECT product_id, quantity FROM transaction_items WHERE transaction_id = ?')
+    .all(id);
+
+  if (txn.type === 'purchase' || txn.type === 'return') {
+    const conflicts = [];
+    for (const item of items) {
+      if (!item.product_id) continue;
+      const product = db.prepare('SELECT name, quantity FROM products WHERE id = ?').get(item.product_id);
+      if (product && product.quantity < item.quantity) {
+        conflicts.push(product.name);
+      }
+    }
+    if (conflicts.length > 0) {
+      const err = new Error('Insufficient stock to void');
+      err.status = 409;
+      err.code = 'insufficient_stock_to_void';
+      err.params = { products: conflicts };
+      throw err;
+    }
+  }
+
+  db.transaction(() => {
+    db.prepare(
+      "UPDATE transactions SET voided_at = datetime('now'), voided_by_id = ? WHERE id = ?",
+    ).run(userId, id);
+
+    for (const item of items) {
+      if (!item.product_id) continue;
+      let delta = 0;
+      if (txn.type === 'purchase' || txn.type === 'return') {
+        delta = -item.quantity; // undo the stock increase
+      } else if (txn.type === 'sale') {
+        delta = item.quantity; // restore sold stock
+      }
+      if (delta !== 0) {
+        db.prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?').run(delta, item.product_id);
+      }
+    }
+  })();
+
+  return getById(id);
+}
+
 /**
  * Lists transactions with optional type/date filtering and pagination.
  * Returns { items, total, page, pageSize }. Each item includes its line items.
  */
+const ALLOWED_TYPES = new Set(['sale', 'purchase', 'service', 'return', 'expense']);
+const SORT_MAP = { date: 'created_at', id: 'id', total: 'total', profit: 'profit' };
+
 export function list(query = {}) {
   const where = [];
   const params = {};
-  if (query.type) {
-    where.push('type = @type');
-    params.type = query.type;
+
+  // multi-type filter (comma-separated); falls back to single type for compat
+  const rawTypes = query.types
+    ? String(query.types).split(',').filter((t) => ALLOWED_TYPES.has(t))
+    : query.type && ALLOWED_TYPES.has(query.type) ? [query.type] : [];
+  if (rawTypes.length > 0) {
+    const placeholders = rawTypes.map((_, i) => `@tp${i}`).join(', ');
+    where.push(`type IN (${placeholders})`);
+    rawTypes.forEach((tp, i) => { params[`tp${i}`] = tp; });
+  }
+
+  if (query.txn_id) {
+    where.push('id = @txnId');
+    params.txnId = Number(query.txn_id);
   }
   if (query.from) {
     where.push('created_at >= @from');
@@ -110,23 +194,55 @@ export function list(query = {}) {
     where.push("json_extract(service_data, '$.direction') = @direction");
     params.direction = query.direction;
   }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  if (query.product) {
+    where.push(`id IN (
+      SELECT ti.transaction_id
+      FROM transaction_items ti
+      LEFT JOIN products p ON p.id = ti.product_id
+      WHERE ti.name_snapshot LIKE @product OR p.barcode LIKE @product
+    )`);
+    params.product = `%${query.product}%`;
+  }
+  const whereSql = `WHERE voided_at IS NULL${where.length ? ' AND ' + where.join(' AND ') : ''}`;
   const page = Math.max(1, Number(query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 20));
   const offset = (page - 1) * pageSize;
 
   const total = getDb().prepare(`SELECT COUNT(*) AS c FROM transactions ${whereSql}`).get(params).c;
   const agg = getDb()
-    .prepare(`SELECT SUM(total) AS sum_total, SUM(profit) AS sum_profit FROM transactions ${whereSql}`)
+    .prepare(`SELECT
+      SUM(CASE WHEN type IN ('return', 'purchase', 'expense') THEN -total ELSE total END) AS sum_total,
+      SUM(CASE WHEN type = 'return' THEN 0 ELSE profit END) AS sum_profit,
+      SUM(CASE WHEN type = 'service' THEN total ELSE 0 END) AS sum_total_svc,
+      SUM(CASE WHEN type = 'service' THEN profit ELSE 0 END) AS sum_profit_svc,
+      SUM(CASE WHEN type IN ('return', 'purchase') THEN -total WHEN type = 'sale' THEN total ELSE 0 END) AS sum_total_prod,
+      SUM(CASE WHEN type = 'sale' THEN profit ELSE 0 END) AS sum_profit_prod
+    FROM transactions ${whereSql}`)
     .get(params);
+  const sortCol = SORT_MAP[query.sort] ?? 'created_at';
+  const sortDir = query.order === 'asc' ? 'ASC' : 'DESC';
+  const orderSql = query.sort === 'count'
+    ? `(SELECT COALESCE(SUM(quantity), 0) FROM transaction_items WHERE transaction_id = transactions.id) ${sortDir}, transactions.id ${sortDir}`
+    : query.sort === 'total'
+    ? `CASE WHEN type IN ('return', 'purchase', 'expense') THEN -total ELSE total END ${sortDir}, id ${sortDir}`
+    : `${sortCol} ${sortDir}, id ${sortDir}`;
+
   const rows = getDb()
-    .prepare(`SELECT * FROM transactions ${whereSql} ORDER BY created_at DESC, id DESC LIMIT @limit OFFSET @offset`)
+    .prepare(`SELECT * FROM transactions ${whereSql} ORDER BY ${orderSql} LIMIT @limit OFFSET @offset`)
     .all({ ...params, limit: pageSize, offset });
 
   const itemsStmt = getDb().prepare('SELECT * FROM transaction_items WHERE transaction_id = ?');
   const items = rows.map((t) => ({ ...t, items: itemsStmt.all(t.id) }));
 
-  return { items, total, page, pageSize, sumTotal: agg?.sum_total ?? 0, sumProfit: agg?.sum_profit ?? 0 };
+  return {
+    items, total, page, pageSize,
+    sumTotal: agg?.sum_total ?? 0,
+    sumProfit: agg?.sum_profit ?? 0,
+    sumTotalSvc: agg?.sum_total_svc ?? 0,
+    sumProfitSvc: agg?.sum_profit_svc ?? 0,
+    sumTotalProd: agg?.sum_total_prod ?? 0,
+    sumProfitProd: agg?.sum_profit_prod ?? 0,
+  };
 }
 
 function round2(n) {
@@ -171,15 +287,19 @@ function createServiceTransaction(payload, user) {
     err.code = 'service_missing';
     throw err;
   }
-  const total = round2(payload.cost);
-  if (!(total > 0)) {
+  const entered = round2(payload.cost);
+  if (!(entered > 0)) {
     const err = new Error('Cost must be greater than 0');
     err.status = 400;
     err.code = 'service_cost_positive';
     throw err;
   }
   const profit = round2(payload.profit ?? 0);
-  const costTotal = round2(total - profit);
+  // "in": total = amount received; costTotal = total − profit (paid to technician)
+  // "out": costTotal = amount paid out (gross); total = costTotal − profit (net after fee)
+  const isOut = service.direction === 'out';
+  const costTotal = isOut ? entered : round2(entered - profit);
+  const total = isOut ? round2(entered - profit) : entered;
   // 'out' services (e.g. Withdraw) pay money to the customer; negate so they
   // reduce totals instead of inflating them. Profit stays positive — it's the fee.
   const sign = service.direction === 'out' ? -1 : 1;
@@ -196,7 +316,21 @@ function createServiceTransaction(payload, user) {
       err.code = 'service_field_required';
       throw err;
     }
-    return { label_en: f.label_en, label_ar: f.label_ar, value };
+    // For select fields, snapshot the Arabic option label so the detail view
+    // can display it correctly in Arabic mode without re-querying the option list.
+    let value_ar = null;
+    if (f.type === 'select' && value) {
+      let opts = [];
+      if (f.option_list_id != null) {
+        const list = optionLists.getById(f.option_list_id);
+        opts = list ? list.options : [];
+      } else {
+        opts = f.options || [];
+      }
+      const match = opts.find((o) => (typeof o === 'string' ? o : o.name_en) === value);
+      if (match && typeof match !== 'string') value_ar = match.name_ar || null;
+    }
+    return { label_en: f.label_en, label_ar: f.label_ar, value, ...(value_ar ? { value_ar } : {}) };
   });
 
   const serviceData = JSON.stringify({

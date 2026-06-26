@@ -218,3 +218,127 @@ describe('transactions API', () => {
     expect(noMatch.body.items.length).toBe(0);
   });
 });
+
+describe('voidTransaction', () => {
+  let api;
+  let db;
+  let cleanup;
+
+  beforeAll(async () => {
+    ({ api, db, cleanup } = await setupTestApp());
+  });
+
+  afterAll(() => cleanup());
+
+  const createProduct = (body) =>
+    api.post('/api/products').send({ category_id: 1, brand_id: 1, ...body }).then((r) => r.body);
+  const getProduct = (id) => api.get(`/api/products/${id}`).then((r) => r.body);
+
+  it('voiding a sale restores stock', async () => {
+    const p = await createProduct({ name: 'VoidSaleTest', buying_price: 100, selling_price: 150, quantity: 5 });
+    const sale = await api
+      .post('/api/transactions')
+      .send({ type: 'sale', items: [{ product_id: p.id, quantity: 2 }] })
+      .then((r) => r.body);
+
+    const res = await api.post(`/api/transactions/${sale.id}/void`);
+    expect(res.status).toBe(200);
+    expect(res.body.voided_at).toBeTruthy();
+
+    const after = await getProduct(p.id);
+    expect(after.quantity).toBe(5); // restored to original
+  });
+
+  it('voiding a purchase removes the added stock', async () => {
+    const p = await createProduct({ name: 'VoidPurchaseTest', buying_price: 50, selling_price: 80, quantity: 0 });
+    const purchase = await api
+      .post('/api/transactions')
+      .send({ type: 'purchase', items: [{ product_id: p.id, quantity: 10, unit_price: 50 }] })
+      .then((r) => r.body);
+
+    const res = await api.post(`/api/transactions/${purchase.id}/void`);
+    expect(res.status).toBe(200);
+
+    const after = await getProduct(p.id);
+    expect(after.quantity).toBe(0); // restored to 0
+  });
+
+  it('voiding a return removes the restocked quantity', async () => {
+    const p = await createProduct({ name: 'VoidReturnTest', buying_price: 50, selling_price: 80, quantity: 5 });
+    // Sell 2, then return 2 (qty back to 5)
+    await api.post('/api/transactions').send({ type: 'sale', items: [{ product_id: p.id, quantity: 2 }] });
+    const ret = await api
+      .post('/api/transactions')
+      .send({ type: 'return', items: [{ product_id: p.id, quantity: 2, unit_price: 80 }] })
+      .then((r) => r.body);
+
+    // Void the return → qty should drop back to 3
+    const res = await api.post(`/api/transactions/${ret.id}/void`);
+    expect(res.status).toBe(200);
+
+    const after = await getProduct(p.id);
+    expect(after.quantity).toBe(3);
+  });
+
+  it('returns 403 window_expired when more than 5 minutes have passed', async () => {
+    const p = await createProduct({ name: 'VoidExpiredTest', buying_price: 50, selling_price: 80, quantity: 3 });
+    const sale = await api
+      .post('/api/transactions')
+      .send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] })
+      .then((r) => r.body);
+
+    // Backdate created_at by 6 minutes using SQLite's datetime modifier
+    db.prepare("UPDATE transactions SET created_at = datetime(created_at, '-6 minutes') WHERE id = ?").run(sale.id);
+
+    const res = await api.post(`/api/transactions/${sale.id}/void`);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('window_expired');
+  });
+
+  it('returns 409 insufficient_stock_to_void when stock was already sold', async () => {
+    const p = await createProduct({ name: 'VoidConflictTest', buying_price: 50, selling_price: 80, quantity: 0 });
+    const purchase = await api
+      .post('/api/transactions')
+      .send({ type: 'purchase', items: [{ product_id: p.id, quantity: 5, unit_price: 50 }] })
+      .then((r) => r.body);
+
+    // Sell all 5 units — stock is now 0
+    await api.post('/api/transactions').send({ type: 'sale', items: [{ product_id: p.id, quantity: 5 }] });
+
+    const res = await api.post(`/api/transactions/${purchase.id}/void`);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('insufficient_stock_to_void');
+    expect(res.body.params.products).toContain('VoidConflictTest');
+  });
+
+  it('returns 400 already_voided when voiding twice', async () => {
+    const p = await createProduct({ name: 'VoidDoubleTest', buying_price: 50, selling_price: 80, quantity: 3 });
+    const sale = await api
+      .post('/api/transactions')
+      .send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] })
+      .then((r) => r.body);
+
+    await api.post(`/api/transactions/${sale.id}/void`);
+    const res = await api.post(`/api/transactions/${sale.id}/void`);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('already_voided');
+  });
+
+  it('voided transactions do not appear in list()', async () => {
+    const p = await createProduct({ name: 'VoidListTest', buying_price: 50, selling_price: 80, quantity: 3 });
+    const sale = await api
+      .post('/api/transactions')
+      .send({ type: 'sale', items: [{ product_id: p.id, quantity: 1 }] })
+      .then((r) => r.body);
+
+    const beforeVoid = await api.get('/api/transactions').then((r) => r.body);
+    const hadIt = beforeVoid.items.some((t) => t.id === sale.id);
+    expect(hadIt).toBe(true);
+
+    await api.post(`/api/transactions/${sale.id}/void`);
+
+    const afterVoid = await api.get('/api/transactions').then((r) => r.body);
+    const stillHasIt = afterVoid.items.some((t) => t.id === sale.id);
+    expect(stillHasIt).toBe(false);
+  });
+});
