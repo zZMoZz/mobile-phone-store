@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate.js';
 import authRouter from './auth.js';
+import licenseRouter from './license.js';
 import usersRouter from './users.js';
 import activityLogsRouter from './activityLogs.js';
 import productsRouter from './products.js';
@@ -22,6 +23,7 @@ router.get('/health', (req, res) => {
 
 // Public — no auth required
 router.use('/auth', authRouter);
+router.use('/license', licenseRouter);
 
 // All routes below require a valid JWT
 router.use(authenticate);
