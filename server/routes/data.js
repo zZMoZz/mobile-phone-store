@@ -71,6 +71,7 @@ router.get('/export/products.csv', canBackup, (req, res) => {
 });
 
 router.get('/export/transactions.csv', canBackup, (req, res) => {
+  const ar = req.query.lang === 'ar';
   const rows = getDb()
     .prepare(
       `SELECT t.id, t.type, t.created_at, t.subtotal, t.fee, t.cost_total, t.total, t.profit,
@@ -80,18 +81,32 @@ router.get('/export/transactions.csv', canBackup, (req, res) => {
        ORDER BY t.id, ti.id`,
     )
     .all();
-  const csv = toCsv(rows, [
-    { key: 'id', label: 'Txn ID' },
-    { key: 'type', label: 'Type' },
-    { key: 'created_at', label: 'Date' },
-    { key: 'item', label: 'Item' },
-    { key: 'quantity', label: 'Qty' },
-    { key: 'unit_price', label: 'Unit Price' },
-    { key: 'line_total', label: 'Line Total' },
-    { key: 'fee', label: 'Fee' },
-    { key: 'total', label: 'Total' },
-    { key: 'profit', label: 'Profit' },
-  ]);
+  const columns = ar
+    ? [
+        { key: 'id', label: 'رقم العملية' },
+        { key: 'type', label: 'النوع' },
+        { key: 'created_at', label: 'التاريخ' },
+        { key: 'item', label: 'العنصر' },
+        { key: 'quantity', label: 'الكمية' },
+        { key: 'unit_price', label: 'سعر الوحدة' },
+        { key: 'line_total', label: 'إجمالي السطر' },
+        { key: 'fee', label: 'رسوم الخدمة' },
+        { key: 'total', label: 'الإجمالي' },
+        { key: 'profit', label: 'الربح' },
+      ]
+    : [
+        { key: 'id', label: 'Txn ID' },
+        { key: 'type', label: 'Type' },
+        { key: 'created_at', label: 'Date' },
+        { key: 'item', label: 'Item' },
+        { key: 'quantity', label: 'Qty' },
+        { key: 'unit_price', label: 'Unit Price' },
+        { key: 'line_total', label: 'Line Total' },
+        { key: 'fee', label: 'Fee' },
+        { key: 'total', label: 'Total' },
+        { key: 'profit', label: 'Profit' },
+      ];
+  const csv = toCsv(rows, columns);
   logActivity({ userId: req.user.id, username: req.user.username, action: 'export_transactions' });
   sendCsv(res, 'transactions.csv', csv);
 });

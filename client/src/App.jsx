@@ -48,8 +48,8 @@ export default function App() {
                     <Route path="/inventory/:id" element={<ProtectedRoute requiredCap="inventory.view"><ProductDetail /></ProtectedRoute>} />
                     <Route path="/new-transaction" element={<NewTransaction />} />
                     <Route path="/transactions" element={<Transactions />} />
-                    <Route path="/services/manage" element={<ProtectedRoute requiredCap="services.manage"><ManageServices /></ProtectedRoute>} />
-                    <Route path="/lists" element={<ProtectedRoute requiredCap="lists.manage"><ManageLists /></ProtectedRoute>} />
+                    <Route path="/services/manage" element={<ProtectedRoute requiredCap={['services.view', 'services.manage']}><ManageServices /></ProtectedRoute>} />
+                    <Route path="/lists" element={<ProtectedRoute requiredCap={['lists.view', 'lists.manage']}><ManageLists /></ProtectedRoute>} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/activity-log" element={<ProtectedRoute requiredCap="see.activity_log"><ActivityLog /></ProtectedRoute>} />
                     <Route path="*" element={<Navigate to="/" replace />} />

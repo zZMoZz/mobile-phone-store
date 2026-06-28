@@ -27,6 +27,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconEdit, IconTrash, IconSearch } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext.jsx';
 import { listServices, createService, updateService, deleteService } from '../api/services.js';
 import { listOptionLists } from '../api/optionLists.js';
 import { listServiceShortcuts, createServiceShortcut, updateServiceShortcut, deleteServiceShortcut } from '../api/serviceShortcuts.js';
@@ -56,6 +57,8 @@ const COLOR_SWATCHES = [
 export default function ManageServices() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
+  const { can } = useAuth();
+  const canManage = can('services.manage');
   const { colorScheme } = useMantineColorScheme();
   const [services, setServices] = useState([]);
   const [optionLists, setOptionLists] = useState([]);
@@ -430,29 +433,31 @@ export default function ManageServices() {
       <Paper withBorder p="md" radius="md">
         <Group justify="space-between" mb="sm">
           <Title order={4}>{t('manageServices.servicesLabel')}</Title>
-          <Group gap="xs">
-            {selectedSvc.size > 0 && (
-              <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} loading={bulkDeletingSvc} onClick={bulkDeleteSvcHandlers.open}>
-                {t('lists.bulkDelete')} ({selectedSvc.size})
+          {canManage && (
+            <Group gap="xs">
+              {selectedSvc.size > 0 && (
+                <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} loading={bulkDeletingSvc} onClick={bulkDeleteSvcHandlers.open}>
+                  {t('lists.bulkDelete')} ({selectedSvc.size})
+                </Button>
+              )}
+              <Button size="xs" variant={allSvcSelected ? 'filled' : 'default'} onClick={toggleSelectAllSvc}>
+                {allSvcSelected ? t('common.deselectAll') : t('common.selectAll')}
               </Button>
-            )}
-            <Button size="xs" variant={allSvcSelected ? 'filled' : 'default'} onClick={toggleSelectAllSvc}>
-              {allSvcSelected ? t('common.deselectAll') : t('common.selectAll')}
-            </Button>
-            <Button size="xs" leftSection={<IconPlus size={16} />} onClick={openNew}>
-              {t('manageServices.addService')}
-            </Button>
-          </Group>
+              <Button size="xs" leftSection={<IconPlus size={16} />} onClick={openNew}>
+                {t('manageServices.addService')}
+              </Button>
+            </Group>
+          )}
         </Group>
         <Table highlightOnHover verticalSpacing="sm" styles={{ td: { fontWeight: 500 } }}>
           <Table.Thead>
             <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
-              <Table.Th w={40} />
+              {canManage && <Table.Th w={40} />}
               <Table.Th>{t('services.nameEn')}</Table.Th>
               <Table.Th>{t('services.nameAr')}</Table.Th>
               <Table.Th>{t('manageServices.fields')}</Table.Th>
               <Table.Th>{t('manageServices.shortcutsCol')}</Table.Th>
-              <Table.Th>{t('common.actions')}</Table.Th>
+              {canManage && <Table.Th>{t('common.actions')}</Table.Th>}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -460,9 +465,11 @@ export default function ManageServices() {
               const svcShortcutCount = shortcuts.filter((sc) => sc.service_id === svc.id).length;
               return (
                 <Table.Tr key={svc.id} bg={selectedSvc.has(svc.id) ? 'var(--mantine-color-indigo-light)' : undefined}>
-                  <Table.Td>
-                    <Checkbox checked={selectedSvc.has(svc.id)} onChange={() => toggleSelectSvc(svc.id)} size="sm" />
-                  </Table.Td>
+                  {canManage && (
+                    <Table.Td>
+                      <Checkbox checked={selectedSvc.has(svc.id)} onChange={() => toggleSelectSvc(svc.id)} size="sm" />
+                    </Table.Td>
+                  )}
                   <Table.Td>{svc.name_en}</Table.Td>
                   <Table.Td>{svc.name_ar}</Table.Td>
                   <Table.Td>
@@ -470,30 +477,34 @@ export default function ManageServices() {
                   </Table.Td>
                   <Table.Td>
                     <Group gap={6} wrap="nowrap">
-                      <ActionIcon variant="light" size="sm" onClick={() => openNewShortcut(svc)}>
-                        <IconPlus size={14} />
-                      </ActionIcon>
+                      {canManage && (
+                        <ActionIcon variant="light" size="sm" onClick={() => openNewShortcut(svc)}>
+                          <IconPlus size={14} />
+                        </ActionIcon>
+                      )}
                       {svcShortcutCount > 0 && (
                         <Text size="sm" fw={700} c="dimmed">{svcShortcutCount}</Text>
                       )}
                     </Group>
                   </Table.Td>
-                  <Table.Td>
-                    <Group gap={4} wrap="nowrap">
-                      <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(svc)}>
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Table.Td>
+                  {canManage && (
+                    <Table.Td>
+                      <Group gap={4} wrap="nowrap">
+                        <ActionIcon variant="subtle" onClick={() => openEdit(svc)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(svc)}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               );
             })}
             {paginatedServices.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={6}>
+                <Table.Td colSpan={canManage ? 6 : 4}>
                   <Center p="lg">
                     <Text c="dimmed">{t('common.noResults')}</Text>
                   </Center>
@@ -514,16 +525,18 @@ export default function ManageServices() {
         <Paper withBorder p="md" radius="md">
           <Group justify="space-between" mb="sm">
             <Title order={4}>{t('manageServices.shortcuts')}</Title>
-            <Group gap="xs">
-              {selectedSc.size > 0 && (
-                <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} loading={bulkDeletingSc} onClick={bulkDeleteScHandlers.open}>
-                  {t('lists.bulkDelete')} ({selectedSc.size})
+            {canManage && (
+              <Group gap="xs">
+                {selectedSc.size > 0 && (
+                  <Button size="xs" color="red" variant="light" leftSection={<IconTrash size={14} />} loading={bulkDeletingSc} onClick={bulkDeleteScHandlers.open}>
+                    {t('lists.bulkDelete')} ({selectedSc.size})
+                  </Button>
+                )}
+                <Button size="xs" variant={allScSelected ? 'filled' : 'default'} onClick={toggleSelectAllSc}>
+                  {allScSelected ? t('common.deselectAll') : t('common.selectAll')}
                 </Button>
-              )}
-              <Button size="xs" variant={allScSelected ? 'filled' : 'default'} onClick={toggleSelectAllSc}>
-                {allScSelected ? t('common.deselectAll') : t('common.selectAll')}
-              </Button>
-            </Group>
+              </Group>
+            )}
           </Group>
           <Group mb="sm" grow>
             <TextInput
@@ -543,12 +556,12 @@ export default function ManageServices() {
           <Table highlightOnHover verticalSpacing="sm" styles={{ td: { fontWeight: 500 } }}>
             <Table.Thead>
               <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
-                <Table.Th w={40} />
+                {canManage && <Table.Th w={40} />}
                 <Table.Th>{t('services.nameEn')}</Table.Th>
                 <Table.Th>{t('services.nameAr')}</Table.Th>
                 <Table.Th>{t('txnType.service')}</Table.Th>
                 <Table.Th>{t('manageServices.color')}</Table.Th>
-                <Table.Th>{t('common.actions')}</Table.Th>
+                {canManage && <Table.Th>{t('common.actions')}</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -556,9 +569,11 @@ export default function ManageServices() {
                 const svc = services.find((s) => s.id === sc.service_id);
                 return (
                   <Table.Tr key={sc.id} bg={selectedSc.has(sc.id) ? 'var(--mantine-color-indigo-light)' : undefined}>
-                    <Table.Td>
-                      <Checkbox checked={selectedSc.has(sc.id)} onChange={() => toggleSelectSc(sc.id)} size="sm" />
-                    </Table.Td>
+                    {canManage && (
+                      <Table.Td>
+                        <Checkbox checked={selectedSc.has(sc.id)} onChange={() => toggleSelectSc(sc.id)} size="sm" />
+                      </Table.Td>
+                    )}
                     <Table.Td>{sc.label_en}</Table.Td>
                     <Table.Td>{sc.label_ar}</Table.Td>
                     <Table.Td>
@@ -571,22 +586,24 @@ export default function ManageServices() {
                         ? <ColorSwatch color={sc.color} size={18} />
                         : <Text size="sm" c="dimmed">—</Text>}
                     </Table.Td>
-                    <Table.Td>
-                      <Group gap={4} wrap="nowrap">
-                        <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteShortcut(sc)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
+                    {canManage && (
+                      <Table.Td>
+                        <Group gap={4} wrap="nowrap">
+                          <ActionIcon variant="subtle" onClick={() => openEditShortcut(sc)}>
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                          <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteShortcut(sc)}>
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    )}
                   </Table.Tr>
                 );
               })}
               {paginatedShortcuts.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={canManage ? 6 : 4}>
                     <Center p="lg">
                       <Text c="dimmed">{t('common.noResults')}</Text>
                     </Center>
@@ -746,7 +763,7 @@ export default function ManageServices() {
       </Modal>
 
       {/* ── Option Lists ──────────────────────────────────────────────────── */}
-      <OptionListSection onUpdate={() => listOptionLists().then(setOptionLists).catch(() => {})} />
+      {canManage && <OptionListSection onUpdate={() => listOptionLists().then(setOptionLists).catch(() => {})} />}
 
       {/* ── Shortcut editor modal ──────────────────────────────────────────── */}
       <Modal

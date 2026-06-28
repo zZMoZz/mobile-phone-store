@@ -228,7 +228,11 @@ export function list(query = {}) {
     : `${sortCol} ${sortDir}, id ${sortDir}`;
 
   const rows = getDb()
-    .prepare(`SELECT * FROM transactions ${whereSql} ORDER BY ${orderSql} LIMIT @limit OFFSET @offset`)
+    .prepare(
+      `SELECT *,
+        CASE WHEN voided_at IS NULL AND unixepoch('now') - unixepoch(created_at) <= 300 THEN 1 ELSE 0 END AS voidable
+       FROM transactions ${whereSql} ORDER BY ${orderSql} LIMIT @limit OFFSET @offset`,
+    )
     .all({ ...params, limit: pageSize, offset });
 
   const itemsStmt = getDb().prepare('SELECT * FROM transaction_items WHERE transaction_id = ?');
@@ -295,6 +299,12 @@ function createServiceTransaction(payload, user) {
     throw err;
   }
   const profit = round2(payload.profit ?? 0);
+  if (profit > entered) {
+    const err = new Error('Profit cannot exceed the amount entered');
+    err.status = 400;
+    err.code = 'service_profit_invalid';
+    throw err;
+  }
   // "in": total = amount received; costTotal = total − profit (paid to technician)
   // "out": costTotal = amount paid out (gross); total = costTotal − profit (net after fee)
   const isOut = service.direction === 'out';
@@ -461,14 +471,16 @@ export function create(payload, user) {
       const { product } = resolveProduct(item);
 
       const unitPrice = round2(item.unit_price ?? product?.selling_price ?? 0);
-      // Cost basis (COGS). For a sale/return of a KNOWN product it must be the
-      // product's CURRENT average buying price at record time — never a stale
-      // client snapshot (a restock between adding the line and recording can move
-      // the average). Purchases carry the batch cost the user entered; unregistered/
-      // manual lines carry their typed cost.
+      // Cost basis (COGS). Purchases carry the batch cost the user entered.
+      // Sales use the product's current average buying_price (fresh COGS at record time).
+      // Returns use the client-supplied unit_cost, which is the original sale's snapshot
+      // (loaded from the source transaction) — so the reversal mirrors the original economics
+      // rather than applying a shifted average. Unregistered/manual lines carry their typed cost.
       let unitCost;
       if (type === 'purchase') {
         unitCost = item.unit_cost != null ? round2(item.unit_cost) : unitPrice;
+      } else if (type === 'return' && item.unit_cost != null && Number(item.unit_cost) > 0) {
+        unitCost = round2(item.unit_cost);
       } else if (product) {
         unitCost = round2(product.buying_price ?? 0);
       } else {

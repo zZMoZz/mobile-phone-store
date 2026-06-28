@@ -7,6 +7,9 @@ export default function ProtectedRoute({ children, requiredCap = null }) {
   if (loading) return <Center h="100vh"><Loader /></Center>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.force_password_change) return <Navigate to="/force-change-password" replace />;
-  if (requiredCap && !can(requiredCap)) return <Navigate to="/" replace />;
+  if (requiredCap) {
+    const caps = Array.isArray(requiredCap) ? requiredCap : [requiredCap];
+    if (!caps.some(can)) return <Navigate to="/" replace />;
+  }
   return children;
 }

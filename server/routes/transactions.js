@@ -19,8 +19,9 @@ const TXN_CAP = {
 
 router.get('/', (req, res) => {
   const query = { ...req.query };
-  if (query.username && !userHas(req.user, 'see.others_transactions')) {
-    delete query.username;
+  if (!userHas(req.user, 'see.others_transactions')) {
+    // Restrict to the caller's own transactions regardless of what was passed.
+    query.username = req.user.username;
   }
   res.json(transactions.list(query));
 });
@@ -33,6 +34,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/:id/void', requirePermission('txn.void'), (req, res) => {
   const result = transactions.voidTransaction(Number(req.params.id), req.user.id);
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'void_transaction', entity: 'transaction', entityId: result.id, detail: { type: result.type } });
   res.json(result);
 });
 

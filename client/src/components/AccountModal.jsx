@@ -12,6 +12,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext.jsx';
+import RecoveryCodeModal from './RecoveryCodeModal.jsx';
 
 export default function AccountModal({ opened, onClose }) {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ export default function AccountModal({ opened, onClose }) {
   const [pwError, setPwError] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState(null);
 
   useEffect(() => {
     if (opened) {
@@ -59,12 +61,17 @@ export default function AccountModal({ opened, onClose }) {
     }
     setSavingPw(true);
     try {
-      await changePassword(currentPw, newPw);
-      notifications.show({ message: t('auth.passwordUpdated'), color: 'green' });
+      const code = await changePassword(currentPw, newPw);
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');
-      onClose();
+      if (code) {
+        onClose();
+        setRecoveryCode(code);
+      } else {
+        notifications.show({ message: t('auth.passwordUpdated'), color: 'green' });
+        onClose();
+      }
     } catch (err) {
       const code = err.response?.data?.code;
       notifications.show({
@@ -77,54 +84,62 @@ export default function AccountModal({ opened, onClose }) {
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title={t('auth.myAccount')}>
-      <Stack gap="md">
-        <Stack gap="xs">
-          <Text fw={500} size="sm">{t('users.displayName')}</Text>
-          <TextInput
-            placeholder={user?.username}
-            value={displayName}
-            onChange={(e) => setDisplayName(e.currentTarget.value)}
-            description={t('users.displayNameHint')}
-          />
-          <Group justify="flex-end">
-            <Button size="sm" loading={savingName} onClick={saveDisplayName}>
-              {t('common.save')}
-            </Button>
-          </Group>
-        </Stack>
+    <>
+      <Modal opened={opened} onClose={onClose} title={t('auth.myAccount')}>
+        <Stack gap="md">
+          <Stack gap="xs">
+            <Text fw={500} size="sm">{t('users.displayName')}</Text>
+            <TextInput
+              placeholder={user?.username}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.currentTarget.value)}
+              description={t('users.displayNameHint')}
+            />
+            <Group justify="flex-end">
+              <Button size="sm" loading={savingName} onClick={saveDisplayName}>
+                {t('common.save')}
+              </Button>
+            </Group>
+          </Stack>
 
-        <Divider label={t('auth.changePassword')} labelPosition="center" />
+          <Divider label={t('auth.changePassword')} labelPosition="center" />
 
-        <Stack gap="xs">
-          <PasswordInput
-            label={t('auth.currentPassword')}
-            value={currentPw}
-            onChange={(e) => setCurrentPw(e.currentTarget.value)}
-          />
-          <PasswordInput
-            label={t('auth.newPassword')}
-            value={newPw}
-            onChange={(e) => setNewPw(e.currentTarget.value)}
-          />
-          <PasswordInput
-            label={t('auth.confirmPassword')}
-            value={confirmPw}
-            onChange={(e) => setConfirmPw(e.currentTarget.value)}
-            error={pwError}
-          />
-          <Group justify="flex-end">
-            <Button
-              size="sm"
-              loading={savingPw}
-              onClick={handleChangePassword}
-              disabled={!currentPw || !newPw || !confirmPw}
-            >
-              {t('auth.changePassword')}
-            </Button>
-          </Group>
+          <Stack gap="xs">
+            <PasswordInput
+              label={t('auth.currentPassword')}
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.currentTarget.value)}
+            />
+            <PasswordInput
+              label={t('auth.newPassword')}
+              value={newPw}
+              onChange={(e) => setNewPw(e.currentTarget.value)}
+            />
+            <PasswordInput
+              label={t('auth.confirmPassword')}
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.currentTarget.value)}
+              error={pwError}
+            />
+            <Group justify="flex-end">
+              <Button
+                size="sm"
+                loading={savingPw}
+                onClick={handleChangePassword}
+                disabled={!currentPw || !newPw || !confirmPw}
+              >
+                {t('auth.changePassword')}
+              </Button>
+            </Group>
+          </Stack>
         </Stack>
-      </Stack>
-    </Modal>
+      </Modal>
+
+      <RecoveryCodeModal
+        code={recoveryCode}
+        opened={!!recoveryCode}
+        onClose={() => setRecoveryCode(null)}
+      />
+    </>
   );
 }

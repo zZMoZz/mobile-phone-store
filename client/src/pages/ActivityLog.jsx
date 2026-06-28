@@ -15,23 +15,21 @@ import {
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { listActivityLogs } from '../api/activityLogs.js';
-import { listUsers } from '../api/users.js';
-import { useAuth } from '../context/AuthContext.jsx';
+import { listUserNames } from '../api/users.js';
 import { formatDate } from '../lib/format.js';
 
 const PAGE_SIZE = 50;
 
 const ALL_ACTIONS = [
-  'login', 'logout',
-  'create_product', 'update_product', 'delete_product', 'restock_product',
-  'record_transaction',
+  'login', 'logout', 'change_password',
+  'create_product', 'update_product', 'delete_product', 'bulk_delete_products', 'bulk_update_products',
+  'record_transaction', 'void_transaction',
   'create_service', 'update_service', 'delete_service',
-  'create_service_type', 'update_service_type', 'delete_service_type',
   'create_shortcut', 'update_shortcut', 'delete_shortcut',
   'create_category', 'update_category', 'delete_category',
   'create_brand', 'update_brand', 'delete_brand',
   'create_option_list', 'update_option_list', 'delete_option_list',
-  'create_user', 'update_user', 'delete_user',
+  'create_user', 'update_user',
   'update_settings', 'create_backup', 'export_products', 'export_transactions',
 ];
 
@@ -42,11 +40,60 @@ function actionColor(action) {
   return 'teal';
 }
 
-function formatDetail(detail) {
+function formatDetail(detail, lang) {
   if (!detail) return '—';
   try {
     const obj = typeof detail === 'string' ? JSON.parse(detail) : detail;
-    return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join(', ');
+    const ar = lang === 'ar';
+
+    const KEY_LABELS = {
+      name:                ar ? 'الاسم'                    : 'Name',
+      type:                ar ? 'النوع'                    : 'Type',
+      quantity:            ar ? 'الكمية'                   : 'Quantity',
+      count:               ar ? 'العدد'                    : 'Count',
+      fields:              ar ? 'الحقول'                   : 'Fields',
+      username:            ar ? 'اسم المستخدم'             : 'Username',
+      role:                ar ? 'الدور'                    : 'Role',
+      status:              ar ? 'الحالة'                   : 'Status',
+      password_reset:      ar ? 'إعادة تعيين كلمة المرور' : 'Password Reset',
+      permissions_updated: ar ? 'تحديث الصلاحيات'         : 'Permissions Updated',
+    };
+
+    const TYPE_VALUES = {
+      purchase: ar ? 'شراء'      : 'Purchase',
+      sale:     ar ? 'بيع'       : 'Sale',
+      service:  ar ? 'خدمة'      : 'Service',
+      return:   ar ? 'مرتجع'     : 'Return',
+      expense:  ar ? 'مصروفات'   : 'Expense',
+      admin:    ar ? 'مسؤول'     : 'Admin',
+      staff:    ar ? 'موظف'      : 'Staff',
+      ACTIVE:   ar ? 'نشط'       : 'Active',
+      DISABLED: ar ? 'معطل'      : 'Disabled',
+      true:     ar ? 'نعم'       : 'Yes',
+    };
+
+    const parts = [];
+
+    // Bilingual name pair → single translated label
+    if ('name_en' in obj || 'name_ar' in obj) {
+      const val = ar ? (obj.name_ar || obj.name_en) : (obj.name_en || obj.name_ar);
+      parts.push(`${ar ? 'الاسم' : 'Name'}: ${val}`);
+    }
+
+    // Bilingual label pair (shortcuts) → single translated label
+    if ('label_en' in obj || 'label_ar' in obj) {
+      const val = ar ? (obj.label_ar || obj.label_en) : (obj.label_en || obj.label_ar);
+      parts.push(`${ar ? 'التسمية' : 'Label'}: ${val}`);
+    }
+
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === 'name_en' || k === 'name_ar' || k === 'label_en' || k === 'label_ar') continue;
+      const label = KEY_LABELS[k] ?? k;
+      const value = Array.isArray(v) ? v.join(', ') : (TYPE_VALUES[String(v)] ?? v);
+      parts.push(`${label}: ${value}`);
+    }
+
+    return parts.join('، ') || '—';
   } catch {
     return String(detail);
   }
@@ -55,8 +102,6 @@ function formatDetail(detail) {
 export default function ActivityLog() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { can } = useAuth();
-  const canSeeOthers = can('see.others_transactions');
 
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -67,10 +112,8 @@ export default function ActivityLog() {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    if (canSeeOthers) {
-      listUsers().then(setUsers).catch(() => {});
-    }
-  }, [canSeeOthers]);
+    listUserNames().then(setUsers).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const params = { page, pageSize: PAGE_SIZE };
@@ -113,23 +156,21 @@ export default function ActivityLog() {
             searchable
             size="sm"
           />
-          {canSeeOthers && (
-            <Select
-              label={t('activityLog.filterUser')}
-              placeholder={t('activityLog.allUsers')}
-              value={userId}
-              onChange={(v) => { setUserId(v); setPage(1); }}
-              data={users.map((u) => ({ value: String(u.id), label: u.username }))}
-              clearable
-              size="sm"
-            />
-          )}
+          <Select
+            label={t('activityLog.filterUser')}
+            placeholder={t('activityLog.allUsers')}
+            value={userId}
+            onChange={(v) => { setUserId(v); setPage(1); }}
+            data={users.map((u) => ({ value: String(u.id), label: u.username }))}
+            clearable
+            size="sm"
+          />
         </Group>
       </Paper>
 
       <Paper withBorder radius="md">
         <ScrollArea>
-          <Table highlightOnHover verticalSpacing="xs">
+          <Table highlightOnHover verticalSpacing="xs" miw={700} styles={{ th: { whiteSpace: 'nowrap' }, td: { whiteSpace: 'nowrap' } }}>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{t('activityLog.date')}</Table.Th>
@@ -151,7 +192,7 @@ export default function ActivityLog() {
                     <Text size="sm" fw={500}>{log.username}</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Badge color={actionColor(log.action)} variant="light" size="sm">
+                    <Badge color={actionColor(log.action)} variant="light" fz={15} w="max-content">
                       {t(`activityLog.actions.${log.action}`, { defaultValue: log.action })}
                     </Badge>
                   </Table.Td>
@@ -163,7 +204,7 @@ export default function ActivityLog() {
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="sm" c="dimmed">{formatDetail(log.detail)}</Text>
+                    <Text size="sm" c="dimmed">{formatDetail(log.detail, lang)}</Text>
                   </Table.Td>
                 </Table.Tr>
               ))}

@@ -14,91 +14,189 @@ import {
   Badge,
   Text,
   Center,
+  Checkbox,
+  SimpleGrid,
+  Divider,
+  Tooltip,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconPencil, IconKey, IconUserOff, IconUserCheck } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { listUsers, createUser, updateUser, deleteUser } from '../api/users.js';
+import { listUsers, createUser, updateUser } from '../api/users.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDate } from '../lib/format.js';
+import { CAPABILITY_GROUPS, PRESETS } from '../lib/permissions.js';
+
+function CapabilityEditor({ value, onChange, t }) {
+  const toggle = (cap) => {
+    onChange(value.includes(cap) ? value.filter((c) => c !== cap) : [...value, cap]);
+  };
+  return (
+    <Stack gap="xs">
+      {CAPABILITY_GROUPS.map(({ group, caps }) => (
+        <div key={group}>
+          <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>
+            {t(`permissions.group.${group}`)}
+          </Text>
+          <SimpleGrid cols={2} spacing={4}>
+            {caps.map((cap) => (
+              <Checkbox
+                key={cap}
+                label={t(`permissions.caps.${cap.replace(/\./g, '_')}`)}
+                checked={value.includes(cap)}
+                onChange={() => toggle(cap)}
+                size="xs"
+              />
+            ))}
+          </SimpleGrid>
+          <Divider mt="xs" />
+        </div>
+      ))}
+    </Stack>
+  );
+}
 
 export default function Users() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { user: currentUser } = useAuth();
+  const { colorScheme } = useMantineColorScheme();
 
   const [users, setUsers] = useState([]);
-  const [editing, setEditing] = useState(null); // null = new, object = edit
-  const [opened, { open, close }] = useDisclosure(false);
+  const isOwner = currentUser?.role === 'owner';
 
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('staff');
-  const [saving, setSaving] = useState(false);
+  // New user modal
+  const [newOpened, { open: openNewModal, close: closeNewModal }] = useDisclosure(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('staff');
+  const [newPermissions, setNewPermissions] = useState([...PRESETS.staff]);
+  const [newErrors, setNewErrors] = useState({});
+  const [newSaving, setNewSaving] = useState(false);
+
+  // Edit user modal
+  const [editTarget, setEditTarget] = useState(null);
+  const [editOpened, { open: openEditModal, close: closeEditModal }] = useDisclosure(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editRole, setEditRole] = useState('staff');
+  const [editPermissions, setEditPermissions] = useState([]);
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Reset password modal
+  const [pwTarget, setPwTarget] = useState(null);
+  const [pwOpened, { open: openPwModal, close: closePwModal }] = useDisclosure(false);
+  const [pwValue, setPwValue] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
 
   const load = () => listUsers().then(setUsers).catch(() => {});
-
   useEffect(() => { load(); }, []);
 
+  const errMsg = (err) => {
+    const code = err.response?.data?.code;
+    if (code) return t(`errors.${code}`, { defaultValue: err.response?.data?.error || t('common.error') });
+    return err.response?.data?.error || t('common.error');
+  };
+
+  // New user
   const openNew = () => {
-    setEditing(null);
-    setUsername('');
-    setPassword('');
-    setRole('staff');
-    open();
+    setNewUsername(''); setNewDisplayName(''); setNewPassword('');
+    setNewRole('staff'); setNewPermissions([...PRESETS.staff]); setNewErrors({});
+    openNewModal();
   };
 
-  const openEdit = (u) => {
-    setEditing(u);
-    setUsername(u.username);
-    setPassword('');
-    setRole(u.role);
-    open();
-  };
-
-  const save = async () => {
-    setSaving(true);
+  const handleCreate = async () => {
+    const errs = {};
+    if (!newUsername.trim()) errs.username = t('errors.user_username_required');
+    if (!newPassword) errs.password = t('errors.user_password_required');
+    if (Object.keys(errs).length) { setNewErrors(errs); return; }
+    setNewErrors({});
+    setNewSaving(true);
     try {
-      if (editing) {
-        const patch = { username, role };
-        if (password) patch.password = password;
-        await updateUser(editing.id, patch);
-      } else {
-        await createUser({ username, password, role });
-      }
+      await createUser({
+        username: newUsername.trim(),
+        display_name: newDisplayName.trim() || undefined,
+        password: newPassword,
+        role: newRole,
+        ...(isOwner ? { permissions: newPermissions } : {}),
+      });
       notifications.show({ message: t('common.saved'), color: 'green' });
-      close();
+      closeNewModal();
       load();
     } catch (err) {
-      notifications.show({ message: err.response?.data?.code ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') }) : (err.response?.data?.error || t('common.error')), color: 'red' });
-    } finally {
-      setSaving(false);
-    }
+      notifications.show({ message: errMsg(err), color: 'red' });
+    } finally { setNewSaving(false); }
   };
 
-  const remove = async (u) => {
-    if (u.id === currentUser?.id) {
-      notifications.show({ message: t('users.cannotDeleteSelf'), color: 'orange' });
-      return;
-    }
-    if (!window.confirm(t('users.deleteConfirm'))) return;
+  // Edit user
+  const openEdit = (u) => {
+    setEditTarget(u);
+    setEditDisplayName(u.display_name || '');
+    setEditRole(u.role);
+    setEditPermissions(Array.isArray(u.permissions) ? u.permissions : []);
+    openEditModal();
+  };
+
+  const handleEdit = async () => {
+    setEditSaving(true);
     try {
-      await deleteUser(u.id);
-      notifications.show({ message: t('common.deleted'), color: 'green' });
+      await updateUser(editTarget.id, {
+        display_name: editDisplayName.trim() || null,
+        ...(isOwner ? { role: editRole, permissions: editPermissions } : {}),
+      });
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      closeEditModal();
       load();
     } catch (err) {
-      notifications.show({ message: err.response?.data?.code ? t(`errors.${err.response.data.code}`, { defaultValue: t('common.error') }) : (err.response?.data?.error || t('common.error')), color: 'red' });
+      notifications.show({ message: errMsg(err), color: 'red' });
+    } finally { setEditSaving(false); }
+  };
+
+  // Reset password
+  const openPw = (u) => {
+    setPwTarget(u); setPwValue(''); setPwError('');
+    openPwModal();
+  };
+
+  const handleResetPassword = async () => {
+    if (!pwValue) { setPwError(t('errors.user_password_required')); return; }
+    setPwError('');
+    setPwSaving(true);
+    try {
+      await updateUser(pwTarget.id, { password: pwValue });
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      closePwModal();
+    } catch (err) {
+      notifications.show({ message: errMsg(err), color: 'red' });
+    } finally { setPwSaving(false); }
+  };
+
+  // Toggle disable / enable
+  const toggleStatus = async (u) => {
+    const newStatus = u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    const msg = newStatus === 'DISABLED' ? t('users.disableConfirm') : t('users.enableConfirm');
+    if (!window.confirm(msg)) return;
+    try {
+      await updateUser(u.id, { status: newStatus });
+      notifications.show({ message: t('common.saved'), color: 'green' });
+      load();
+    } catch (err) {
+      notifications.show({ message: errMsg(err), color: 'red' });
     }
   };
 
-  const roleColor = (r) => (r === 'admin' ? 'violet' : 'blue');
+  const roleColor = (r) => (r === 'owner' ? 'violet' : r === 'admin' ? 'indigo' : 'blue');
+  const roleLabel = (r) => t(`users.role${r === 'owner' ? 'Owner' : r === 'admin' ? 'Admin' : 'Staff'}`);
+  const canAct = (u) => u.role !== 'owner' && u.id !== currentUser?.id;
 
   return (
     <Stack>
       <Group justify="space-between" align="center">
-        <Title order={2}>{t('users.title')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openNew}>
+        <Title order={2} fz={18}>{t('users.title')}</Title>
+        <Button leftSection={<IconPlus size={14} />} onClick={openNew} fz="12.8px">
           {t('users.addUser')}
         </Button>
       </Group>
@@ -106,48 +204,70 @@ export default function Users() {
       <Paper withBorder radius="md">
         <Table highlightOnHover verticalSpacing="sm">
           <Table.Thead>
-            <Table.Tr>
+            <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
               <Table.Th>{t('users.username')}</Table.Th>
+              <Table.Th>{t('users.displayName')}</Table.Th>
               <Table.Th>{t('users.role')}</Table.Th>
+              <Table.Th>{t('users.status')}</Table.Th>
               <Table.Th>{t('users.createdAt')}</Table.Th>
-              <Table.Th w={80} />
+              <Table.Th w={100} />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {users.map((u) => (
               <Table.Tr key={u.id}>
+                <Table.Td><Text fw={500}>{u.username}</Text></Table.Td>
                 <Table.Td>
-                  <Text fw={500}>{u.username}</Text>
+                  <Text c={u.display_name ? undefined : 'dimmed'}>{u.display_name || '—'}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge color={roleColor(u.role)} variant="light">
-                    {t(`users.role${u.role === 'admin' ? 'Admin' : 'Staff'}`)}
+                  <Badge color={roleColor(u.role)} variant="filled" tt="uppercase">
+                    {roleLabel(u.role)}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>
+                  <Badge
+                    color={u.status === 'ACTIVE' ? 'green' : 'orange'}
+                    variant="dot"
+                    tt="uppercase"
+                  >
+                    {u.status === 'ACTIVE' ? t('users.statusActive') : t('users.statusDisabled')}
                   </Badge>
                 </Table.Td>
                 <Table.Td>{formatDate(u.created_at, lang)}</Table.Td>
                 <Table.Td>
-                  <Group gap={4} justify="flex-end">
-                    <ActionIcon variant="subtle" onClick={() => openEdit(u)}>
-                      <IconPencil size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      disabled={u.id === currentUser?.id}
-                      onClick={() => remove(u)}
-                    >
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
+                  {canAct(u) && (
+                    <Group gap={4} justify="flex-end" wrap="nowrap">
+                      <Tooltip label={t('common.edit')}>
+                        <ActionIcon variant="subtle" color="blue" onClick={() => openEdit(u)}>
+                          <IconPencil size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label={t('users.resetPassword')}>
+                        <ActionIcon variant="subtle" color="orange" onClick={() => openPw(u)}>
+                          <IconKey size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label={u.status === 'ACTIVE' ? t('users.disable') : t('users.enable')}>
+                        <ActionIcon
+                          variant="subtle"
+                          color={u.status === 'ACTIVE' ? 'red' : 'green'}
+                          onClick={() => toggleStatus(u)}
+                        >
+                          {u.status === 'ACTIVE'
+                            ? <IconUserOff size={16} />
+                            : <IconUserCheck size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))}
             {users.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={4}>
-                  <Center p="lg">
-                    <Text c="dimmed">{t('common.noResults')}</Text>
-                  </Center>
+                <Table.Td colSpan={6}>
+                  <Center p="lg"><Text c="dimmed">{t('common.noResults')}</Text></Center>
                 </Table.Td>
               </Table.Tr>
             )}
@@ -155,38 +275,100 @@ export default function Users() {
         </Table>
       </Paper>
 
-      <Modal
-        opened={opened}
-        onClose={close}
-        title={editing ? t('users.editUser') : t('users.newUser')}
-      >
+      {/* New User Modal */}
+      <Modal opened={newOpened} onClose={closeNewModal} title={t('users.newUser')} size="md">
         <Stack gap="sm">
           <TextInput
             label={t('users.username')}
-            value={username}
-            onChange={(e) => setUsername(e.currentTarget.value)}
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.currentTarget.value)}
+            error={newErrors.username}
             required
           />
-          <PasswordInput
-            label={t('users.password')}
-            description={editing ? t('users.passwordHint') : undefined}
-            value={password}
-            onChange={(e) => setPassword(e.currentTarget.value)}
-            required={!editing}
+          <TextInput
+            label={t('users.displayName')}
+            description={t('users.displayNameHint')}
+            value={newDisplayName}
+            onChange={(e) => setNewDisplayName(e.currentTarget.value)}
           />
-          <Select
-            label={t('users.role')}
-            value={role}
-            onChange={(v) => v && setRole(v)}
-            data={[
-              { value: 'admin', label: t('users.roleAdmin') },
-              { value: 'staff', label: t('users.roleStaff') },
-            ]}
-            allowDeselect={false}
+          <PasswordInput
+            label={t('users.tempPassword')}
+            description={t('users.tempPasswordHint')}
+            value={newPassword}
+            onChange={(e) => { setNewPassword(e.currentTarget.value); if (newErrors.password) setNewErrors((p) => ({ ...p, password: undefined })); }}
+            error={newErrors.password}
+            required
+          />
+          {isOwner && (
+            <>
+              <Select
+                label={t('users.role')}
+                description={t('users.roleHint')}
+                value={newRole}
+                onChange={(v) => { if (v) { setNewRole(v); setNewPermissions([...(PRESETS[v] ?? [])]); } }}
+                data={[
+                  { value: 'admin', label: t('users.roleAdmin') },
+                  { value: 'staff', label: t('users.roleStaff') },
+                ]}
+                allowDeselect={false}
+              />
+              <CapabilityEditor value={newPermissions} onChange={setNewPermissions} t={t} />
+            </>
+          )}
+          <Text size="xs" c="dimmed">{t('users.newUserHint')}</Text>
+          <Group justify="flex-end" mt="sm">
+            <Button variant="default" onClick={closeNewModal}>{t('common.cancel')}</Button>
+            <Button loading={newSaving} onClick={handleCreate}>{t('common.save')}</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal opened={editOpened} onClose={closeEditModal} title={t('users.editUser')} size="md">
+        <Stack gap="sm">
+          <TextInput
+            label={t('users.displayName')}
+            description={t('users.displayNameHint')}
+            value={editDisplayName}
+            onChange={(e) => setEditDisplayName(e.currentTarget.value)}
+          />
+          {isOwner && (
+            <>
+              <Select
+                label={t('users.role')}
+                description={t('users.roleHint')}
+                value={editRole}
+                onChange={(v) => v && setEditRole(v)}
+                data={[
+                  { value: 'admin', label: t('users.roleAdmin') },
+                  { value: 'staff', label: t('users.roleStaff') },
+                ]}
+                allowDeselect={false}
+              />
+              <CapabilityEditor value={editPermissions} onChange={setEditPermissions} t={t} />
+            </>
+          )}
+          <Group justify="flex-end" mt="sm">
+            <Button variant="default" onClick={closeEditModal}>{t('common.cancel')}</Button>
+            <Button loading={editSaving} onClick={handleEdit}>{t('common.save')}</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal opened={pwOpened} onClose={closePwModal} title={t('users.resetPassword')}>
+        <Stack gap="sm">
+          <PasswordInput
+            label={t('users.tempPassword')}
+            description={t('users.tempPasswordHint')}
+            value={pwValue}
+            onChange={(e) => { setPwValue(e.currentTarget.value); if (pwError) setPwError(''); }}
+            error={pwError}
+            required
           />
           <Group justify="flex-end" mt="sm">
-            <Button variant="default" onClick={close}>{t('common.cancel')}</Button>
-            <Button loading={saving} onClick={save}>{t('common.save')}</Button>
+            <Button variant="default" onClick={closePwModal}>{t('common.cancel')}</Button>
+            <Button loading={pwSaving} onClick={handleResetPassword}>{t('common.save')}</Button>
           </Group>
         </Stack>
       </Modal>

@@ -74,6 +74,7 @@ export default function NewTransaction() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { can } = useAuth();
+  const showCost = can('see.cost');
   const canSale = can('txn.sale');
   const canReturn = can('txn.return');
   const canExpense = can('txn.expense');
@@ -407,7 +408,7 @@ export default function NewTransaction() {
               <Table.Th w={90}>{t('newTxn.inStock')}</Table.Th>
               <Table.Th w={70}>{t('newTxn.quantity')}</Table.Th>
               <Table.Th w={100}>{type === 'return' ? t('newTxn.refundPerUnit') : t('newTxn.unitPrice')}</Table.Th>
-              {type === 'sale' && <Table.Th w={120}>{t('newTxn.unitProfit')}</Table.Th>}
+              {type === 'sale' && showCost && <Table.Th w={120}>{t('newTxn.unitProfit')}</Table.Th>}
               <Table.Th w={120}>{t('newTxn.lineTotal')}</Table.Th>
               <Table.Th w={48} />
             </Table.Tr>
@@ -480,7 +481,7 @@ export default function NewTransaction() {
                     }}
                   />
                 </Table.Td>
-                {type === 'sale' && (
+                {type === 'sale' && showCost && (
                   <Table.Td>
                     <Text fw={700} c={(Number(l.unit_price) - Number(l.unit_cost)) < 0 ? 'red' : 'green'}>
                       {formatMoney(Number(l.unit_price) - Number(l.unit_cost), lang)}
@@ -497,7 +498,7 @@ export default function NewTransaction() {
             ))}
             {lines.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={type === 'sale' ? 8 : 7}>
+                <Table.Td colSpan={type === 'sale' && showCost ? 8 : 7}>
                   <Center p="md">
                     <Text c="dimmed">{t('newTxn.empty')}</Text>
                   </Center>
@@ -517,7 +518,7 @@ export default function NewTransaction() {
             <Text fw={700}>
               {type === 'return' ? t('newTxn.refundTotal') : t('newTxn.total')}: {formatMoney(totals.total, lang)}
             </Text>
-            {type === 'sale' && (
+            {type === 'sale' && showCost && (
               <Text fw={700} c={totals.profit < 0 ? 'red' : 'green'}>
                 {t('newTxn.profit')}: {formatMoney(totals.profit, lang)}
               </Text>

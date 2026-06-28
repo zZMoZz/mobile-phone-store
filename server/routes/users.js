@@ -10,6 +10,13 @@ const router = Router();
 const canManageUsers = requirePermission('users.manage');
 const isOwner = (req) => req.user.role === 'owner';
 
+// GET /names — lightweight id+username list for filter dropdowns; activity-log viewers need this
+router.get('/names', requirePermission('see.activity_log'), (req, res, next) => {
+  try {
+    res.json(list().map(({ id, username }) => ({ id, username })));
+  } catch (err) { next(err); }
+});
+
 // GET / — anyone who can manage users
 router.get('/', canManageUsers, (req, res, next) => {
   try { res.json(list()); } catch (err) { next(err); }
@@ -40,7 +47,7 @@ router.post('/', canManageUsers, (req, res, next) => {
 
     const password_hash = bcrypt.hashSync(password, 10);
     const user = create({ username, display_name, password_hash, role, permissions, force_password_change: 1 });
-    logActivity({ userId: req.user.id, username: req.user.username, action: 'create_user', entity: 'user', entityId: user.id });
+    logActivity({ userId: req.user.id, username: req.user.username, action: 'create_user', entity: 'user', entityId: user.id, detail: { username: user.username, role: user.role } });
     res.status(201).json(user);
   } catch (err) { next(err); }
 });
@@ -57,9 +64,16 @@ router.put('/:id', (req, res, next) => {
     const target = getById(targetId);
     if (!target) return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
 
-    const { display_name, role, status, password, permissions } = req.body ?? {};
+    const { username, display_name, role, status, password, permissions } = req.body ?? {};
     const patch = {};
     let needsInvalidation = false;
+
+    // username — needs users.manage; never the owner target.
+    if (username !== undefined) {
+      if (!canManage) return res.status(403).json({ error: 'Forbidden', code: 'auth_forbidden' });
+      if (target.role === 'owner') return res.status(403).json({ error: 'Cannot change the owner username', code: 'auth_forbidden' });
+      patch.username = username;
+    }
 
     // display_name — self always allowed; otherwise needs users.manage and a non-owner target.
     if (display_name !== undefined) {
@@ -119,7 +133,12 @@ router.put('/:id', (req, res, next) => {
       incrementTokenVersion(targetId);
     }
 
-    logActivity({ userId: callerId, username: req.user.username, action: 'update_user', entity: 'user', entityId: targetId });
+    const changes = {};
+    if ('role' in patch) changes.role = patch.role;
+    if ('status' in patch) changes.status = patch.status;
+    if ('password_hash' in patch) changes.password_reset = true;
+    if ('permissions' in patch) changes.permissions_updated = true;
+    logActivity({ userId: callerId, username: req.user.username, action: 'update_user', entity: 'user', entityId: targetId, detail: { username: target.username, ...changes } });
     res.json(getById(targetId));
   } catch (err) { next(err); }
 });

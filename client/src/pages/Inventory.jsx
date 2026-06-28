@@ -57,7 +57,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 15;
 
-function SummaryCard({ label, value, color, icon, onClick, active, description }) {
+function SummaryCard({ label, value, color, icon, onClick, active, description, blurred = false }) {
   return (
     <Paper
       withBorder
@@ -81,7 +81,7 @@ function SummaryCard({ label, value, color, icon, onClick, active, description }
           </Text>
         ) : null}
       </Group>
-      <Text fw={700} size="xl" c={color}>
+      <Text fw={700} size="xl" c={color} style={blurred ? { filter: 'blur(4px)', userSelect: 'none' } : undefined}>
         {value}
       </Text>
     </Paper>
@@ -404,6 +404,7 @@ export default function Inventory() {
         label={t('inventory.summary.costValue')}
         value={formatMoney(summary.inventory_cost_value, lang, { noCents: true })}
         description={t('inventory.summary.costValueHint')}
+        blurred={!showCost}
       />
       <SummaryCard
         label={t('inventory.summary.lowStock')}

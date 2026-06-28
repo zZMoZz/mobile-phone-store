@@ -146,8 +146,8 @@ export default function AppLayout({ children }) {
     { to: '/inventory', key: 'inventory', icon: IconBox, show: can('inventory.view') },
     { to: '/new-transaction', key: 'newTransaction', icon: IconShoppingCartPlus, show: canTransact },
     { to: '/transactions', key: 'transactions', icon: IconReceipt, show: canTransact },
-    { to: '/services/manage', key: 'services', icon: IconTool, show: can('services.manage') },
-    { to: '/lists', key: 'lists', icon: IconTags, show: can('lists.manage') },
+    { to: '/services/manage', key: 'services', icon: IconTool, show: can('services.view') || can('services.manage') },
+    { to: '/lists', key: 'lists', icon: IconTags, show: can('lists.view') || can('lists.manage') },
     { to: '/activity-log', key: 'activityLog', icon: IconHistory, show: can('see.activity_log') },
     { to: '/settings', key: 'settings', icon: IconSettings, show: canSettings },
   ].filter((item) => item.show);

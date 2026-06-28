@@ -5,6 +5,11 @@ export async function listUsers() {
   return data;
 }
 
+export async function listUserNames() {
+  const { data } = await api.get('/users/names');
+  return data;
+}
+
 export async function createUser(body) {
   // body: { username, display_name?, password, role, permissions? }
   const { data } = await api.post('/users', body);

@@ -4,7 +4,7 @@
 export const CAPABILITIES = [
   // See (visibility)
   'see.cost',                 // cost & profit/margin columns
-  'see.others_transactions',  // username filter on transactions & activity log
+  'see.others_transactions',  // username filter on transactions list
   'see.activity_log',         // access the activity log
   // Do (actions)
   'txn.sale',
@@ -14,7 +14,9 @@ export const CAPABILITIES = [
   'txn.void',
   'inventory.view',
   'inventory.edit',
+  'services.view',
   'services.manage',
+  'lists.view',
   'lists.manage',
   'settings.manage',
   'data.backup',

@@ -128,10 +128,29 @@ router.post('/change-password', authenticate, (req, res, next) => {
     const password_hash = bcrypt.hashSync(new_password, 10);
     updateFields(req.user.id, { password_hash });
     const newTv = incrementTokenVersion(req.user.id);
+
+    let recovery_code = null;
+    if (['admin', 'owner'].includes(req.user.role)) {
+      recovery_code = generateAndStoreRecoveryCode(req.user.id);
+    }
+
     const user = getById(req.user.id);
     const token = makeUserToken(user, newTv);
     logActivity({ userId: user.id, username: user.username, action: 'change_password' });
-    res.json({ token, user: safeUser(user) });
+    res.json({ token, user: safeUser(user), recovery_code });
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/verify-password — authenticated, confirm the caller's own password
+router.post('/verify-password', authenticate, (req, res, next) => {
+  try {
+    const { password } = req.body ?? {};
+    if (!password) return res.status(400).json({ error: 'Password required', code: 'user_password_required' });
+    const full = getByIdFull(req.user.id);
+    if (!bcrypt.compareSync(password, full.password_hash)) {
+      return res.status(400).json({ error: 'Incorrect password', code: 'auth_wrong_password' });
+    }
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

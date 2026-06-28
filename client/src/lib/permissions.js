@@ -4,7 +4,14 @@
 export const CAPABILITY_GROUPS = [
   {
     group: 'see',
-    caps: ['see.cost', 'see.others_transactions', 'see.activity_log'],
+    caps: [
+      'see.cost',
+      'see.others_transactions',
+      'see.activity_log',
+      'inventory.view',
+      'services.view',
+      'lists.view',
+    ],
   },
   {
     group: 'do',
@@ -14,7 +21,6 @@ export const CAPABILITY_GROUPS = [
       'txn.expense',
       'txn.return',
       'txn.void',
-      'inventory.view',
       'inventory.edit',
       'services.manage',
       'lists.manage',

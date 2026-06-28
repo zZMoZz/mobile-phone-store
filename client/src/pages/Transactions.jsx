@@ -92,6 +92,7 @@ export default function Transactions() {
   const lang = i18n.language;
   const { can } = useAuth();
   const canSeeOthers = can('see.others_transactions');
+  const showCost = can('see.cost');
   const { colorScheme } = useMantineColorScheme();
 
   const [filterTypes, setFilterTypes] = useState([]);
@@ -189,8 +190,7 @@ export default function Transactions() {
     }
   };
 
-  const isVoidable = (txn) =>
-    Date.now() - new Date(txn.created_at + 'Z').getTime() < 5 * 60 * 1000;
+  const isVoidable = (txn) => !!txn.voidable;
 
   const handleVoidClick = (e, txn) => {
     e.stopPropagation(); // prevent row click from opening detail modal
@@ -241,31 +241,38 @@ export default function Transactions() {
     label: lang === 'ar' ? s.name_ar : s.name_en,
   }));
 
-  const typeSelectData = [
-    { value: 'sale', label: t('txnType.sale') },
-    { value: 'purchase', label: t('txnType.purchase') },
-    { value: 'service', label: t('txnType.service') },
-    { value: 'return', label: t('txnType.return') },
-    { value: 'expense', label: t('txnType.expense') },
+  const allTypeOptions = [
+    { value: 'sale', label: t('txnType.sale'), cap: 'txn.sale' },
+    { value: 'purchase', label: t('txnType.purchase'), cap: 'inventory.edit' },
+    { value: 'service', label: t('txnType.service'), cap: 'txn.service' },
+    { value: 'return', label: t('txnType.return'), cap: 'txn.return' },
+    { value: 'expense', label: t('txnType.expense'), cap: 'txn.expense' },
   ];
+  const typeSelectData = canSeeOthers
+    ? allTypeOptions
+    : allTypeOptions.filter(({ cap }) => can(cap));
 
   const sortFieldData = [
     { value: 'date', label: t('txns.date') },
     { value: 'id', label: t('txns.txnId') },
     { value: 'count', label: t('txns.itemCount') },
     { value: 'total', label: t('txns.total') },
-    { value: 'profit', label: t('txns.profit') },
+    ...(showCost ? [{ value: 'profit', label: t('txns.profit') }] : []),
   ];
 
   const mkCards = (total, profit) => (
     <Stack gap="xs">
       <SummaryCard label={t('txns.statTotal')} value={formatMoney(total, lang, { noCents: true })} />
-      <SummaryCard
-        label={t('txns.statProfit')}
-        value={formatMoney(profit, lang, { noCents: true })}
-        color={profit < 0 ? 'red' : undefined}
-      />
-      <SummaryCard label={t('txns.statCost')} value={formatMoney(total - profit, lang, { noCents: true })} />
+      {showCost && (
+        <SummaryCard
+          label={t('txns.statProfit')}
+          value={formatMoney(profit, lang, { noCents: true })}
+          color={profit < 0 ? 'red' : undefined}
+        />
+      )}
+      {showCost && (
+        <SummaryCard label={t('txns.statCost')} value={formatMoney(total - profit, lang, { noCents: true })} />
+      )}
     </Stack>
   );
 
@@ -423,8 +430,8 @@ export default function Transactions() {
                 <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.items')}</Table.Th>
                 <Table.Th w={40} style={{ whiteSpace: 'nowrap' }}>{t('txns.itemCount')}</Table.Th>
                 <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.total')}</Table.Th>
-                <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.statCost')}</Table.Th>
-                <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.profit')}</Table.Th>
+                {showCost && <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.statCost')}</Table.Th>}
+                {showCost && <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.profit')}</Table.Th>}
                 <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.user')}</Table.Th>
                 <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('txns.note')}</Table.Th>
                 <Table.Th w={40} />
@@ -456,7 +463,7 @@ export default function Transactions() {
                         <Group gap={6} wrap="nowrap">
                           <Text lineClamp={1}>{svcName}</Text>
                           {svcDir && (
-                            <Text c={svcDir === 'in' ? 'green' : 'red'} fw={500} style={{ whiteSpace: 'nowrap' }}>
+                            <Text fz="xs" c={svcDir === 'in' ? 'green' : 'red'} fw={500} style={{ whiteSpace: 'nowrap' }}>
                               {t(`txns.direction${svcDir === 'in' ? 'In' : 'Out'}`)}
                             </Text>
                           )}
@@ -471,14 +478,18 @@ export default function Transactions() {
                     <Table.Td fz={17} c={txn.type === 'return' || txn.type === 'purchase' || txn.type === 'expense' || txn.total < 0 ? 'red' : undefined} style={{ whiteSpace: 'nowrap' }}>
                       {formatMoney(txn.type === 'return' || txn.type === 'purchase' || txn.type === 'expense' ? -txn.total : txn.total, lang)}
                     </Table.Td>
-                    <Table.Td fz={17} c={txn.type === 'purchase' || txn.cost_total < 0 ? 'red' : undefined} style={{ whiteSpace: 'nowrap' }}>
-                      {txn.type === 'expense' || txn.type === 'return'
-                        ? '—'
-                        : formatMoney(txn.type === 'purchase' ? -txn.cost_total : txn.cost_total, lang)}
-                    </Table.Td>
-                    <Table.Td fz={17} style={{ whiteSpace: 'nowrap' }}>
-                      {(txn.type === 'purchase' || txn.type === 'return' || txn.type === 'expense') ? '—' : formatMoney(txn.profit, lang)}
-                    </Table.Td>
+                    {showCost && (
+                      <Table.Td fz={17} c={txn.type === 'purchase' || txn.cost_total < 0 ? 'red' : undefined} style={{ whiteSpace: 'nowrap' }}>
+                        {txn.type === 'expense' || txn.type === 'return'
+                          ? '—'
+                          : formatMoney(txn.type === 'purchase' ? -txn.cost_total : txn.cost_total, lang)}
+                      </Table.Td>
+                    )}
+                    {showCost && (
+                      <Table.Td fz={17} style={{ whiteSpace: 'nowrap' }}>
+                        {(txn.type === 'purchase' || txn.type === 'return' || txn.type === 'expense') ? '—' : formatMoney(txn.profit, lang)}
+                      </Table.Td>
+                    )}
                     <Table.Td c="dimmed" style={{ whiteSpace: 'nowrap' }}>{txn.username_snapshot || '—'}</Table.Td>
                     <Table.Td c="dimmed">{txn.note || '—'}</Table.Td>
                     <Table.Td onClick={(e) => e.stopPropagation()}>
@@ -499,7 +510,7 @@ export default function Transactions() {
               })}
               {historyData.items.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={11}>
+                  <Table.Td colSpan={showCost ? 11 : 9}>
                     <Center p="lg">
                       <Text c="dimmed">{t('common.noResults')}</Text>
                     </Center>
@@ -609,8 +620,8 @@ export default function Transactions() {
                     <Table.Th>{t('newTxn.barcode')}</Table.Th>
                     <Table.Th>{t('newTxn.quantity')}</Table.Th>
                     <Table.Th>{t('newTxn.unitPrice')}</Table.Th>
-                    <Table.Th>{t('newTxn.unitCost')}</Table.Th>
-                    <Table.Th>{t('newTxn.profit')}</Table.Th>
+                    {showCost && <Table.Th>{t('newTxn.unitCost')}</Table.Th>}
+                    {showCost && <Table.Th>{t('newTxn.profit')}</Table.Th>}
                     <Table.Th>{t('newTxn.lineTotal')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
@@ -621,8 +632,8 @@ export default function Transactions() {
                       <Table.Td c="dimmed">{it.barcode || '—'}</Table.Td>
                       <Table.Td>{formatNumber(it.quantity, lang)}</Table.Td>
                       <Table.Td>{formatMoney(it.unit_price, lang)}</Table.Td>
-                      <Table.Td>{formatMoney(it.unit_cost, lang)}</Table.Td>
-                      <Table.Td>{formatMoney((it.unit_price - it.unit_cost) * it.quantity, lang)}</Table.Td>
+                      {showCost && <Table.Td>{formatMoney(it.unit_cost, lang)}</Table.Td>}
+                      {showCost && <Table.Td>{formatMoney((it.unit_price - it.unit_cost) * it.quantity, lang)}</Table.Td>}
                       <Table.Td>{formatMoney(it.line_total, lang)}</Table.Td>
                     </Table.Tr>
                   ))}
@@ -636,7 +647,7 @@ export default function Transactions() {
                     <Table.Th>{t('newTxn.barcode')}</Table.Th>
                     <Table.Th>{t('newTxn.quantity')}</Table.Th>
                     <Table.Th>{t('newTxn.refundPerUnit')}</Table.Th>
-                    <Table.Th>{t('inventory.columns.buyingPrice')}</Table.Th>
+                    {showCost && <Table.Th>{t('inventory.columns.buyingPrice')}</Table.Th>}
                     <Table.Th>{t('newTxn.refundTotal')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
@@ -647,7 +658,7 @@ export default function Transactions() {
                       <Table.Td c="dimmed">{it.barcode || '—'}</Table.Td>
                       <Table.Td>{formatNumber(it.quantity, lang)}</Table.Td>
                       <Table.Td>{formatMoney(it.unit_price, lang)}</Table.Td>
-                      <Table.Td>{formatMoney(it.unit_cost, lang)}</Table.Td>
+                      {showCost && <Table.Td>{formatMoney(it.unit_cost, lang)}</Table.Td>}
                       <Table.Td c="red">{formatMoney(it.line_total, lang)}</Table.Td>
                     </Table.Tr>
                   ))}
@@ -683,13 +694,13 @@ export default function Transactions() {
                 <Text fw={700} c={detail.type === 'return' ? 'red' : undefined}>
                   {detail.type === 'return' ? t('newTxn.refundTotal') : t('newTxn.total')}: {formatMoney(detail.total, lang)}
                 </Text>
-                {detail.type !== 'expense' && detail.type !== 'return' && detail.profit !== 0 && (
+                {showCost && detail.type !== 'expense' && detail.type !== 'return' && detail.profit !== 0 && (
                   <Text size="sm" c={detail.cost_total < 0 ? 'red' : 'dimmed'}>
                     {t('txns.statCost')}: {formatMoney(detail.type === 'purchase' ? -detail.cost_total : detail.cost_total, lang)}
                   </Text>
                 )}
               </Stack>
-              {detail.type !== 'purchase' && detail.type !== 'return' && detail.type !== 'expense' && (
+              {showCost && detail.type !== 'purchase' && detail.type !== 'return' && detail.type !== 'expense' && (
                 <Badge color="teal" variant="light" size="lg">
                   {t('newTxn.profit')}: {formatMoney(detail.profit, lang)}
                 </Badge>

@@ -86,8 +86,9 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const changePassword = useCallback(async (current_password, new_password) => {
-    const { token: t, user: u } = await changePasswordApi(current_password, new_password);
+    const { token: t, user: u, recovery_code } = await changePasswordApi(current_password, new_password);
     applySession(t, u);
+    return recovery_code ?? null;
   }, [applySession]);
 
   const updateUserInContext = useCallback(async (id, patch) => {

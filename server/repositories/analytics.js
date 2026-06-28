@@ -7,7 +7,7 @@ import { get as getSettings } from './settings.js';
  */
 export function overview(query = {}) {
   const db = getDb();
-  const where = [];
+  const where = ['voided_at IS NULL'];
   const params = {};
   if (query.from) {
     where.push('created_at >= @from');
@@ -17,7 +17,7 @@ export function overview(query = {}) {
     where.push('created_at <= @to');
     params.to = query.to;
   }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const whereSql = `WHERE ${where.join(' AND ')}`;
 
   // Totals by type.
   const totalsRows = db
@@ -65,9 +65,53 @@ export function overview(query = {}) {
               SUM(ti.line_total) AS revenue
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
-       WHERE t.type IN ('sale','service') ${query.from ? 'AND t.created_at >= @from' : ''} ${query.to ? 'AND t.created_at <= @to' : ''}
+       WHERE t.voided_at IS NULL AND t.type IN ('sale','service') ${query.from ? 'AND t.created_at >= @from' : ''} ${query.to ? 'AND t.created_at <= @to' : ''}
        GROUP BY ti.name_snapshot
        ORDER BY qty DESC
+       LIMIT 5`,
+    )
+    .all(params);
+
+  // Top purchased products (from purchase transactions).
+  const topBuyingProducts = db
+    .prepare(
+      `SELECT ti.name_snapshot AS name,
+              SUM(ti.quantity) AS qty,
+              SUM(ti.line_total) AS total
+       FROM transaction_items ti
+       JOIN transactions t ON t.id = ti.transaction_id
+       WHERE t.voided_at IS NULL AND t.type = 'purchase' ${query.from ? 'AND t.created_at >= @from' : ''} ${query.to ? 'AND t.created_at <= @to' : ''}
+       GROUP BY ti.name_snapshot
+       ORDER BY qty DESC
+       LIMIT 5`,
+    )
+    .all(params);
+
+  // Top returned products (from return transactions).
+  const topReturningProducts = db
+    .prepare(
+      `SELECT ti.name_snapshot AS name,
+              SUM(ti.quantity) AS qty
+       FROM transaction_items ti
+       JOIN transactions t ON t.id = ti.transaction_id
+       WHERE t.voided_at IS NULL AND t.type = 'return' ${query.from ? 'AND t.created_at >= @from' : ''} ${query.to ? 'AND t.created_at <= @to' : ''}
+       GROUP BY ti.name_snapshot
+       ORDER BY qty DESC
+       LIMIT 5`,
+    )
+    .all(params);
+
+  // Top selling services by transaction count.
+  const topServices = db
+    .prepare(
+      `SELECT s.name_en, s.name_ar,
+              COUNT(*) AS count,
+              SUM(t.total) AS revenue
+       FROM transactions t
+       JOIN services s ON s.id = t.service_id
+       WHERE t.voided_at IS NULL AND t.type = 'service' ${query.from ? 'AND t.created_at >= @from' : ''} ${query.to ? 'AND t.created_at <= @to' : ''}
+       GROUP BY s.id
+       ORDER BY count DESC
        LIMIT 5`,
     )
     .all(params);
@@ -82,5 +126,5 @@ export function overview(query = {}) {
     )
     .all(threshold);
 
-  return { totals, trend, topProducts, lowStock, lowStockThreshold: threshold };
+  return { totals, trend, topProducts, topBuyingProducts, topReturningProducts, topServices, lowStock, lowStockThreshold: threshold };
 }

@@ -70,6 +70,13 @@ export function updateFields(id, fields) {
   if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) {
     throw makeError(404, 'user_not_found');
   }
+  if (fields.username !== undefined) {
+    const newUsername = fields.username?.trim();
+    if (!newUsername) throw makeError(400, 'user_username_required');
+    const conflict = db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id != ?').get(newUsername, id);
+    if (conflict) throw makeError(409, 'user_username_taken');
+    db.prepare('UPDATE users SET username = ? WHERE id = ?').run(newUsername, id);
+  }
   const ALLOWED = ['display_name', 'role', 'status', 'password_hash', 'force_password_change', 'permissions'];
   const sets = [];
   const values = [];

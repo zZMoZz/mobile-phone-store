@@ -13,23 +13,9 @@ import {
   Center,
   Loader,
 } from '@mantine/core';
-import { AreaChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
 import { getAnalytics } from '../api/analytics.js';
 import { formatMoney, formatNumber, periodStart } from '../lib/format.js';
-
-function StatCard({ label, value, color }) {
-  return (
-    <Paper withBorder p="md" radius="md">
-      <Text size="xs" c="dimmed">
-        {label}
-      </Text>
-      <Text fw={700} size="xl" c={color}>
-        {value}
-      </Text>
-    </Paper>
-  );
-}
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
@@ -57,12 +43,6 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, [params]);
 
-  const chartData = (data?.trend || []).map((row) => ({
-    date: row.bucket,
-    [t('dashboard.salesTotal')]: row.sales,
-    [t('dashboard.profitTotal')]: row.profit,
-  }));
-
   return (
     <Stack>
       <Group justify="space-between">
@@ -85,38 +65,6 @@ export default function Dashboard() {
         </Center>
       ) : (
         <>
-          <SimpleGrid cols={{ base: 2, md: 6 }}>
-            <StatCard label={t('dashboard.salesTotal')} value={formatMoney(data.totals.sales, lang)} color="blue" />
-            <StatCard label={t('dashboard.profitTotal')} value={formatMoney(data.totals.profit, lang)} color="teal" />
-            <StatCard label={t('dashboard.purchasesTotal')} value={formatMoney(data.totals.purchases, lang)} />
-            <StatCard label={t('dashboard.txnCount')} value={formatNumber(data.totals.count, lang)} />
-            <StatCard label={t('dashboard.servicesTotal')} value={formatMoney(data.totals.services, lang)} color="grape" />
-            <StatCard label={t('dashboard.expensesTotal')} value={formatMoney(data.totals.expenses, lang)} color="red" />
-          </SimpleGrid>
-
-          <Paper withBorder p="md" radius="md">
-            <Text fw={600} mb="md">
-              {t('dashboard.salesTrend')}
-            </Text>
-            {chartData.length > 0 ? (
-              <AreaChart
-                h={280}
-                data={chartData}
-                dataKey="date"
-                withLegend
-                curveType="monotone"
-                series={[
-                  { name: t('dashboard.salesTotal'), color: 'blue.6' },
-                  { name: t('dashboard.profitTotal'), color: 'teal.6' },
-                ]}
-              />
-            ) : (
-              <Center p="lg">
-                <Text c="dimmed">{t('dashboard.noData')}</Text>
-              </Center>
-            )}
-          </Paper>
-
           <SimpleGrid cols={{ base: 1, md: 2 }}>
             <Paper withBorder p="md" radius="md">
               <Group justify="space-between" mb="sm">
@@ -163,6 +111,70 @@ export default function Dashboard() {
                         <Table.Td>{p.name}</Table.Td>
                         <Table.Td style={{ textAlign: 'end' }}>{formatNumber(p.qty, lang)}</Table.Td>
                         <Table.Td style={{ textAlign: 'end' }}>{formatMoney(p.revenue, lang)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              )}
+            </Paper>
+          </SimpleGrid>
+
+          <SimpleGrid cols={{ base: 1, md: 3 }}>
+            <Paper withBorder p="md" radius="md">
+              <Text fw={600} mb="sm">
+                {t('dashboard.topBuyingProducts')}
+              </Text>
+              {data.topBuyingProducts.length === 0 ? (
+                <Text c="dimmed">{t('dashboard.noData')}</Text>
+              ) : (
+                <Table>
+                  <Table.Tbody>
+                    {data.topBuyingProducts.map((p, idx) => (
+                      <Table.Tr key={idx}>
+                        <Table.Td>{p.name}</Table.Td>
+                        <Table.Td style={{ textAlign: 'end' }}>{formatNumber(p.qty, lang)}</Table.Td>
+                        <Table.Td style={{ textAlign: 'end' }}>{formatMoney(p.total, lang)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              )}
+            </Paper>
+
+            <Paper withBorder p="md" radius="md">
+              <Text fw={600} mb="sm">
+                {t('dashboard.topReturningProducts')}
+              </Text>
+              {data.topReturningProducts.length === 0 ? (
+                <Text c="dimmed">{t('dashboard.noData')}</Text>
+              ) : (
+                <Table>
+                  <Table.Tbody>
+                    {data.topReturningProducts.map((p, idx) => (
+                      <Table.Tr key={idx}>
+                        <Table.Td>{p.name}</Table.Td>
+                        <Table.Td style={{ textAlign: 'end' }}>{formatNumber(p.qty, lang)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              )}
+            </Paper>
+
+            <Paper withBorder p="md" radius="md">
+              <Text fw={600} mb="sm">
+                {t('dashboard.topServices')}
+              </Text>
+              {data.topServices.length === 0 ? (
+                <Text c="dimmed">{t('dashboard.noData')}</Text>
+              ) : (
+                <Table>
+                  <Table.Tbody>
+                    {data.topServices.map((s, idx) => (
+                      <Table.Tr key={idx}>
+                        <Table.Td>{lang === 'ar' ? s.name_ar : s.name_en}</Table.Td>
+                        <Table.Td style={{ textAlign: 'end' }}>{formatNumber(s.count, lang)}</Table.Td>
+                        <Table.Td style={{ textAlign: 'end' }}>{formatMoney(s.revenue, lang)}</Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>

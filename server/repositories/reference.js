@@ -30,6 +30,8 @@ function makeRepo(table, usageColumn) {
   const getById = (id) => getDb().prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
 
   return {
+    getById,
+
     // Each row carries how many products reference it, so the UI can offer to
     // move them elsewhere before deleting.
     list: () =>

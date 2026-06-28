@@ -5,6 +5,39 @@ import { listByProduct, historyByProduct, create as createTransaction } from '..
 import { uploadProductImage, uploadedUrl } from '../lib/upload.js';
 import { logActivity } from '../repositories/activityLogs.js';
 import { requirePermission } from '../middleware/requirePermission.js';
+import { userHas } from '../lib/permissions.js';
+
+// Strip buying_price from a product object when the caller lacks see.cost.
+function hideCost(product, user) {
+  if (!product || userHas(user, 'see.cost')) return product;
+  const { buying_price, ...rest } = product;
+  return rest;
+}
+
+// Apply hideCost to the paginated list shape { items, total, page, pageSize }.
+function hideCostList({ items, ...rest }, user) {
+  if (userHas(user, 'see.cost')) return { items, ...rest };
+  return { ...rest, items: items.map((p) => hideCost(p, user)) };
+}
+
+// Strip inventory_cost_value from the summary object.
+function hideSummaryCost(data, user) {
+  if (userHas(user, 'see.cost')) return data;
+  const { inventory_cost_value, ...rest } = data;
+  return rest;
+}
+
+// Strip unit_cost from transaction history rows.
+function hideHistoryCost(items, user) {
+  if (userHas(user, 'see.cost')) return items;
+  return items.map(({ unit_cost, ...rest }) => rest);
+}
+
+// Apply hideHistoryCost to the paginated history shape.
+function hideCostHistoryPage({ items, ...rest }, user) {
+  if (userHas(user, 'see.cost')) return { items, ...rest };
+  return { ...rest, items: hideHistoryCost(items, user) };
+}
 
 const router = Router();
 
@@ -53,12 +86,12 @@ function paidUnitCost(body, product) {
 }
 
 router.get('/', (req, res) => {
-  res.json(products.list(req.query));
+  res.json(hideCostList(products.list(req.query), req.user));
 });
 
 // Specific routes before "/:id" so they aren't captured as ids.
 router.get('/summary', (req, res) => {
-  res.json(products.summary(req.query));
+  res.json(hideSummaryCost(products.summary(req.query), req.user));
 });
 
 // All product ids matching the current filters (for "select all matching").
@@ -69,22 +102,22 @@ router.get('/ids', (req, res) => {
 router.get('/lookup', (req, res) => {
   const product = products.findByBarcode(req.query.barcode);
   if (!product) return res.status(404).json({ error: 'Not found' });
-  res.json(product);
+  res.json(hideCost(product, req.user));
 });
 
 router.get('/search', (req, res) => {
-  res.json(products.searchByName(req.query.q || ''));
+  res.json(products.searchByName(req.query.q || '').map((p) => hideCost(p, req.user)));
 });
 
 router.get('/:id', (req, res) => {
   const product = products.getById(Number(req.params.id));
   if (!product) return res.status(404).json({ error: 'Not found' });
-  res.json({ ...product, history: listByProduct(product.id) });
+  res.json({ ...hideCost(product, req.user), history: hideHistoryCost(listByProduct(product.id), req.user) });
 });
 
 // Paginated, type-filterable transaction history for one product.
 router.get('/:id/history', (req, res) => {
-  res.json(historyByProduct(Number(req.params.id), req.query));
+  res.json(hideCostHistoryPage(historyByProduct(Number(req.params.id), req.query), req.user));
 });
 
 router.post('/', canEdit, (req, res) => {
@@ -99,7 +132,7 @@ router.post('/', canEdit, (req, res) => {
     return products.getById(product.id);
   })();
   logActivity({ userId: req.user.id, username: req.user.username, action: 'create_product', entity: 'product', entityId: result.id, detail: { name: result.name } });
-  res.status(201).json(result);
+  res.status(201).json(hideCost(result, req.user));
 });
 
 // Inventory "add stock" by barcode: restock an existing product, or create one
@@ -121,8 +154,8 @@ router.post('/add-stock', canEdit, (req, res) => {
     }
     return products.getById(product.id);
   })();
-  logActivity({ userId: req.user.id, username: req.user.username, action: 'restock_product', entity: 'product', entityId: result.id, detail: { name: result.name, quantity: qty } });
-  res.status(201).json(result);
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'record_transaction', entity: 'product', entityId: result.id, detail: { type: 'purchase', name: result.name, quantity: qty } });
+  res.status(201).json(hideCost(result, req.user));
 });
 
 router.post('/:id/add-stock', canEdit, (req, res) => {
@@ -142,8 +175,8 @@ router.post('/:id/add-stock', canEdit, (req, res) => {
     });
     return products.getById(product.id);
   })();
-  logActivity({ userId: req.user.id, username: req.user.username, action: 'restock_product', entity: 'product', entityId: result.id, detail: { name: result.name, quantity: qty } });
-  res.json(result);
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'record_transaction', entity: 'product', entityId: result.id, detail: { type: 'purchase', name: result.name, quantity: qty } });
+  res.json(hideCost(result, req.user));
 });
 
 // How many of the given products still hold stock (to warn before deleting).
@@ -182,14 +215,15 @@ router.put('/:id', canEdit, (req, res) => {
   const updated = products.update(id, req.body);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   logActivity({ userId: req.user.id, username: req.user.username, action: 'update_product', entity: 'product', entityId: id, detail: { name: updated.name } });
-  res.json(updated);
+  res.json(hideCost(updated, req.user));
 });
 
 router.delete('/:id', canEdit, (req, res) => {
   const id = Number(req.params.id);
-  const ok = products.remove(id);
-  if (!ok) return res.status(404).json({ error: 'Not found' });
-  logActivity({ userId: req.user.id, username: req.user.username, action: 'delete_product', entity: 'product', entityId: id });
+  const product = products.getById(id);
+  if (!product) return res.status(404).json({ error: 'Not found' });
+  products.remove(id);
+  logActivity({ userId: req.user.id, username: req.user.username, action: 'delete_product', entity: 'product', entityId: id, detail: { name: product.name } });
   res.status(204).end();
 });
 
@@ -201,7 +235,7 @@ router.post('/:id/image', canEdit, (req, res, next) => {
       image_path: uploadedUrl(req.file.filename),
     });
     if (!updated) return res.status(404).json({ error: 'Not found' });
-    logActivity({ userId: req.user.id, username: req.user.username, action: 'update_product', entity: 'product', entityId: Number(req.params.id) });
+    logActivity({ userId: req.user.id, username: req.user.username, action: 'update_product', entity: 'product', entityId: Number(req.params.id), detail: { name: updated.name } });
     res.json(updated);
   });
 });

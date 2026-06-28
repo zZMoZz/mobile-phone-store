@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Title,
   Stack,
@@ -21,6 +21,7 @@ import {
   Alert,
   List,
   Checkbox,
+  ScrollArea,
 } from '@mantine/core';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -45,6 +46,7 @@ import {
   pickFolder,
 } from '../api/settings.js';
 import { listUsers, createUser, updateUser } from '../api/users.js';
+import { verifyPasswordApi } from '../api/auth.js';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { setLanguage } from '../i18n/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -59,7 +61,7 @@ export default function Settings() {
   const defaultNameEn = i18n.getFixedT('en')('app.title');
   const defaultNameAr = i18n.getFixedT('ar')('app.title');
   const { setSettings } = useSettings();
-  const { setColorScheme } = useMantineColorScheme();
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
   const { can, isOwner, user: currentUser } = useAuth();
   const canSettings = can('settings.manage');
   const canBackup = can('data.backup');
@@ -88,6 +90,35 @@ export default function Settings() {
   const [tempPassword, setTempPassword] = useState('');
   const [userSaving, setUserSaving] = useState(false);
   const [resetSaving, setResetSaving] = useState(false);
+
+  // Password verification gate
+  const [verifyOpened, { open: openVerify, close: closeVerify }] = useDisclosure(false);
+  const [verifyPw, setVerifyPw] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const pendingAction = useRef(null);
+
+  const withVerification = (action) => {
+    pendingAction.current = action;
+    setVerifyPw('');
+    setVerifyError('');
+    openVerify();
+  };
+
+  const handleVerify = async () => {
+    setVerifyLoading(true);
+    setVerifyError('');
+    try {
+      await verifyPasswordApi(verifyPw);
+      closeVerify();
+      pendingAction.current?.();
+    } catch (err) {
+      const code = err.response?.data?.code;
+      setVerifyError(code ? t(`errors.${code}`, { defaultValue: t('common.error') }) : t('common.error'));
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
 
   useEffect(() => {
     getSettings().then(setValues);
@@ -160,7 +191,7 @@ export default function Settings() {
 
   const loadUsers = () => listUsers().then(setUsers).catch(() => {});
 
-  const openNew = () => {
+  const openNew = () => withVerification(() => {
     setEditing(null);
     setUsername('');
     setDisplayName('');
@@ -168,9 +199,9 @@ export default function Settings() {
     setRole('staff');
     setPermissions(PRESETS.staff);
     openUserModal();
-  };
+  });
 
-  const openEdit = (u) => {
+  const openEdit = (u) => withVerification(() => {
     setEditing(u);
     setUsername(u.username);
     setDisplayName(u.display_name || '');
@@ -178,19 +209,20 @@ export default function Settings() {
     setRole(u.role);
     setPermissions(u.permissions ?? []);
     openUserModal();
-  };
+  });
 
-  const openResetPassword = (u) => {
+  const openResetPassword = (u) => withVerification(() => {
     setResetTarget(u);
     setTempPassword('');
     openResetPw();
-  };
+  });
 
   const saveUser = async () => {
     setUserSaving(true);
     try {
       if (editing) {
         const patch = {};
+        if (username !== editing.username) patch.username = username.trim();
         if (displayName !== (editing.display_name || '')) patch.display_name = displayName.trim() || null;
         if (role !== editing.role) patch.role = role;
         // Capabilities are owner-only; send them when they actually changed.
@@ -244,16 +276,22 @@ export default function Settings() {
     }
   };
 
-  const toggleStatus = async (u) => {
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [confirmOpened, { open: openConfirm, close: closeConfirm }] = useDisclosure(false);
+
+  const toggleStatus = (u) => {
     if (u.id === currentUser?.id) {
       notifications.show({ message: t('users.cannotDisableSelf'), color: 'orange' });
       return;
     }
-    const newStatus = u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
-    const msg = newStatus === 'DISABLED' ? t('users.disableConfirm') : t('users.enableConfirm');
-    if (!window.confirm(msg)) return;
+    withVerification(() => { setConfirmTarget(u); openConfirm(); });
+  };
+
+  const confirmToggleStatus = async () => {
+    const u = confirmTarget;
+    closeConfirm();
     try {
-      await updateUser(u.id, { status: newStatus });
+      await updateUser(u.id, { status: u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE' });
       notifications.show({ message: t('common.saved'), color: 'green' });
       loadUsers();
     } catch (err) {
@@ -394,7 +432,7 @@ export default function Settings() {
               size="md"
               leftSection={<IconFileExport size={18} />}
               loading={exportingTransactions}
-              onClick={() => downloadCsv('/export/transactions.csv', 'transactions.csv', setExportingTransactions)}
+              onClick={() => downloadCsv(`/export/transactions.csv?lang=${lang}`, 'transactions.csv', setExportingTransactions)}
             >
               {t('settings.exportTransactions')}
             </Button>
@@ -404,22 +442,23 @@ export default function Settings() {
 
       {canUsers && (
         <Paper withBorder radius="md">
-          <Group justify="space-between" align="center" p="lg" pb="xs">
-            <Text fw={600} fz="md">{t('users.title')}</Text>
-            <Button size="sm" leftSection={<IconPlus size={14} />} onClick={openNew}>
+          <Group justify="space-between" align="center" p={10}>
+            <Text fw={600} fz={18}>{t('users.title')}</Text>
+            <Button size="sm" leftSection={<IconPlus size={14} />} onClick={openNew} fz="12.8px">
               {t('users.addUser')}
             </Button>
           </Group>
           <Divider />
-          <Table highlightOnHover verticalSpacing="md" fz="md">
+          <ScrollArea>
+          <Table highlightOnHover verticalSpacing="md" fz={15} miw={700} styles={{ th: { padding: 10, whiteSpace: 'nowrap' }, td: { whiteSpace: 'nowrap' } }}>
             <Table.Thead>
-              <Table.Tr>
+              <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
                 <Table.Th>{t('users.username')}</Table.Th>
                 <Table.Th>{t('users.displayName')}</Table.Th>
                 <Table.Th>{t('users.role')}</Table.Th>
                 <Table.Th>{t('users.status')}</Table.Th>
                 <Table.Th>{t('users.createdAt')}</Table.Th>
-                <Table.Th w={120} />
+                <Table.Th w={120}>{t('common.actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -478,6 +517,7 @@ export default function Settings() {
               )}
             </Table.Tbody>
           </Table>
+          </ScrollArea>
         </Paper>
       )}
 
@@ -488,18 +528,13 @@ export default function Settings() {
         title={editing ? t('users.editUser') : t('users.newUser')}
       >
         <Stack gap="sm">
-          {!editing && (
-            <TextInput
-              size="md"
-              label={t('users.username')}
-              value={username}
-              onChange={(e) => setUsername(e.currentTarget.value)}
-              required
-            />
-          )}
-          {editing && (
-            <Text size="sm" c="dimmed">{t('auth.username')}: <strong>{editing.username}</strong></Text>
-          )}
+          <TextInput
+            size="md"
+            label={t('users.username')}
+            value={username}
+            onChange={(e) => setUsername(e.currentTarget.value)}
+            required
+          />
           <TextInput
             size="md"
             label={t('users.displayName')}
@@ -521,24 +556,18 @@ export default function Settings() {
             label={t('users.role')}
             description={t('users.roleHint')}
             value={role}
-            onChange={(v) => v && setRole(v)}
+            onChange={(v) => {
+              if (!v) return;
+              setRole(v);
+              setPermissions([...(PRESETS[v] ?? [])]);
+            }}
             data={roleOptions()}
             allowDeselect={false}
             disabled={!isOwner}
           />
           {isOwner && (
             <Stack gap="xs">
-              <Group justify="space-between" align="center">
-                <Text size="sm" fw={600}>{t('permissions.title')}</Text>
-                <Group gap="xs">
-                  <Button size="compact-xs" variant="light" onClick={() => setPermissions(PRESETS.admin)}>
-                    {t('permissions.presetAdmin')}
-                  </Button>
-                  <Button size="compact-xs" variant="light" color="gray" onClick={() => setPermissions(PRESETS.staff)}>
-                    {t('permissions.presetStaff')}
-                  </Button>
-                </Group>
-              </Group>
+              <Text size="sm" fw={600}>{t('permissions.title')}</Text>
               <Checkbox.Group value={permissions} onChange={setPermissions}>
                 <Stack gap="sm">
                   {CAPABILITY_GROUPS.map((g) => (
@@ -591,6 +620,47 @@ export default function Settings() {
             <Button variant="default" onClick={closeResetPw}>{t('common.cancel')}</Button>
             <Button loading={resetSaving} onClick={saveResetPassword} disabled={!tempPassword}>
               {t('users.resetPassword')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+      {/* Password verification modal */}
+      <Modal opened={verifyOpened} onClose={closeVerify} title={t('auth.verifyTitle')} size="sm">
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">{t('auth.verifyHint')}</Text>
+          <PasswordInput
+            label={t('auth.password')}
+            value={verifyPw}
+            onChange={(e) => { setVerifyPw(e.currentTarget.value); if (verifyError) setVerifyError(''); }}
+            error={verifyError}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleVerify(); }}
+            autoFocus
+          />
+          <Group justify="flex-end" mt="sm">
+            <Button variant="default" onClick={closeVerify}>{t('common.cancel')}</Button>
+            <Button loading={verifyLoading} onClick={handleVerify}>{t('common.confirm')}</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Disable / Enable confirmation modal */}
+      <Modal
+        opened={confirmOpened}
+        onClose={closeConfirm}
+        title={confirmTarget?.status === 'ACTIVE' ? t('users.disable') : t('users.enable')}
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            {confirmTarget?.status === 'ACTIVE' ? t('users.disableConfirm') : t('users.enableConfirm')}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeConfirm}>{t('common.cancel')}</Button>
+            <Button
+              color={confirmTarget?.status === 'ACTIVE' ? 'red' : 'green'}
+              onClick={confirmToggleStatus}
+            >
+              {confirmTarget?.status === 'ACTIVE' ? t('users.disable') : t('users.enable')}
             </Button>
           </Group>
         </Stack>

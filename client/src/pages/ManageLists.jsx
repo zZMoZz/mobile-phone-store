@@ -22,6 +22,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconEdit, IconTrash, IconSearch, IconLock, IconChevronUp, IconChevronDown, IconSelector } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
   listCategories,
   createCategory,
@@ -36,7 +37,7 @@ import { apiErrorMessage } from '../lib/apiError.js';
 
 const PAGE_SIZE = 10;
 
-function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQuery }) {
+function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQuery, canManage }) {
   const { t, i18n } = useTranslation();
   const { colorScheme } = useMantineColorScheme();
   const lang = i18n.language;
@@ -208,36 +209,38 @@ function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQue
     <Paper withBorder p="md" radius="md">
       <Group justify="space-between" mb="sm">
         <Title order={4}>{title}</Title>
-        <Group gap="xs">
-          {selected.size > 0 && (
+        {canManage && (
+          <Group gap="xs">
+            {selected.size > 0 && (
+              <Button
+                size="xs"
+                color="red"
+                variant="light"
+                leftSection={<IconTrash size={14} />}
+                loading={bulkDeleting}
+                onClick={handleBulkDelete}
+              >
+                {t('lists.bulkDelete')} ({selected.size})
+              </Button>
+            )}
             <Button
               size="xs"
-              color="red"
-              variant="light"
-              leftSection={<IconTrash size={14} />}
-              loading={bulkDeleting}
-              onClick={handleBulkDelete}
+              variant={allSelected ? 'filled' : 'default'}
+              onClick={toggleSelectAll}
             >
-              {t('lists.bulkDelete')} ({selected.size})
+              {allSelected ? t('common.deselectAll') : t('common.selectAll')}
             </Button>
-          )}
-          <Button
-            size="xs"
-            variant={allSelected ? 'filled' : 'default'}
-            onClick={toggleSelectAll}
-          >
-            {allSelected ? t('common.deselectAll') : t('common.selectAll')}
-          </Button>
-          <Button size="xs" leftSection={<IconPlus size={16} />} onClick={openNew}>
-            {addLabel}
-          </Button>
-        </Group>
+            <Button size="xs" leftSection={<IconPlus size={16} />} onClick={openNew}>
+              {addLabel}
+            </Button>
+          </Group>
+        )}
       </Group>
 
       <Table highlightOnHover verticalSpacing="sm" styles={{ td: { fontWeight: 500 } }}>
         <Table.Thead>
           <Table.Tr bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'gray.2'}>
-            <Table.Th w={40} />
+            {canManage && <Table.Th w={40} />}
             <Table.Th>{t('services.nameEn')}</Table.Th>
             <Table.Th>{t('services.nameAr')}</Table.Th>
             <Table.Th w={110} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }} onClick={() => toggleSort('product_count')}>
@@ -246,25 +249,27 @@ function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQue
             <Table.Th w={110} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }} onClick={() => toggleSort('units_count')}>
               {t('lists.unitsCount')} <SortIcon col="units_count" />
             </Table.Th>
-            <Table.Th>{t('common.actions')}</Table.Th>
+            {canManage && <Table.Th>{t('common.actions')}</Table.Th>}
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
           {paginated.map((item) => (
             <Table.Tr key={item.id} bg={selected.has(item.id) ? 'var(--mantine-color-indigo-light)' : undefined}>
-              <Table.Td>
-                {canSelect(item) ? (
-                  <Checkbox
-                    checked={selected.has(item.id)}
-                    onChange={() => toggleSelect(item.id)}
-                    size="sm"
-                  />
-                ) : (
-                  <Tooltip label={t('lists.protectedTooltip')} withArrow>
-                    <IconLock size={16} style={{ color: 'var(--mantine-color-dimmed)', display: 'block' }} />
-                  </Tooltip>
-                )}
-              </Table.Td>
+              {canManage && (
+                <Table.Td>
+                  {canSelect(item) ? (
+                    <Checkbox
+                      checked={selected.has(item.id)}
+                      onChange={() => toggleSelect(item.id)}
+                      size="sm"
+                    />
+                  ) : (
+                    <Tooltip label={t('lists.protectedTooltip')} withArrow>
+                      <IconLock size={16} style={{ color: 'var(--mantine-color-dimmed)', display: 'block' }} />
+                    </Tooltip>
+                  )}
+                </Table.Td>
+              )}
               <Table.Td>{item.name_en}</Table.Td>
               <Table.Td>{item.name_ar}</Table.Td>
               <Table.Td>
@@ -277,29 +282,31 @@ function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQue
                   {item.units_count ?? 0}
                 </Text>
               </Table.Td>
-              <Table.Td>
-                <Group gap={4} wrap="nowrap">
-                  <ActionIcon variant="subtle" onClick={() => openEdit(item)}>
-                    <IconEdit size={16} />
-                  </ActionIcon>
-                  {item.is_protected ? (
-                    <Tooltip label={t('lists.protectedTooltip')}>
-                      <ActionIcon variant="subtle" color="gray" style={{ cursor: 'not-allowed' }} onClick={(e) => e.preventDefault()}>
+              {canManage && (
+                <Table.Td>
+                  <Group gap={4} wrap="nowrap">
+                    <ActionIcon variant="subtle" onClick={() => openEdit(item)}>
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    {item.is_protected ? (
+                      <Tooltip label={t('lists.protectedTooltip')}>
+                        <ActionIcon variant="subtle" color="gray" style={{ cursor: 'not-allowed' }} onClick={(e) => e.preventDefault()}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    ) : (
+                      <ActionIcon variant="subtle" color="red" onClick={() => askRemove(item)}>
                         <IconTrash size={16} />
                       </ActionIcon>
-                    </Tooltip>
-                  ) : (
-                    <ActionIcon variant="subtle" color="red" onClick={() => askRemove(item)}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  )}
-                </Group>
-              </Table.Td>
+                    )}
+                  </Group>
+                </Table.Td>
+              )}
             </Table.Tr>
           ))}
           {paginated.length === 0 && (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={canManage ? 6 : 4}>
                 <Center p="lg">
                   <Text c="dimmed">{t('common.noResults')}</Text>
                 </Center>
@@ -438,6 +445,8 @@ function ReferenceSection({ title, addLabel, newTitle, editTitle, api, searchQue
 
 export default function ManageLists() {
   const { t } = useTranslation();
+  const { can } = useAuth();
+  const canManage = can('lists.manage');
   const [search, setSearch] = useState('');
 
   return (
@@ -459,6 +468,7 @@ export default function ManageLists() {
         editTitle={t('lists.editCategory')}
         api={{ list: listCategories, create: createCategory, update: updateCategory, remove: deleteCategory }}
         searchQuery={search}
+        canManage={canManage}
       />
 
       <ReferenceSection
@@ -468,6 +478,7 @@ export default function ManageLists() {
         editTitle={t('lists.editBrand')}
         api={{ list: listBrands, create: createBrand, update: updateBrand, remove: deleteBrand }}
         searchQuery={search}
+        canManage={canManage}
       />
     </Stack>
   );
