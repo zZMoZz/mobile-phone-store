@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
 import { ROOT_DIR, UPLOADS_DIR, ASSETS_DIR } from './db/paths.js';
+import { requireLicense } from './middleware/requireLicense.js';
 import apiRouter from './routes/index.js';
 
 /**
@@ -14,6 +15,10 @@ export function createApp() {
 
   app.use(cors());
   app.use(express.json({ limit: '5mb' }));
+
+  // License gate: blocks frontend routes on unlicensed machines.
+  // API routes (/api/*), assets, and uploads are always allowed through.
+  app.use(requireLicense);
 
   // Static: bundled default assets and user-uploaded product images.
   app.use('/assets', express.static(ASSETS_DIR));
