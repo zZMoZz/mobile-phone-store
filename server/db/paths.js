@@ -14,7 +14,6 @@ export const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 export const BACKUPS_DIR = process.env.STORE_BACKUPS_DIR || path.join(DATA_DIR, 'backups');
 
 export const DB_PATH = process.env.STORE_DB_PATH || path.join(DATA_DIR, 'store.db');
-export const LICENSE_PATH = process.env.STORE_LICENSE_PATH || path.join(DATA_DIR, 'license.key');
 export const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 export const ASSETS_DIR = path.join(ROOT_DIR, 'assets');

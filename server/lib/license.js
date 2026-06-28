@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { LICENSE_PATH } from '../db/paths.js';
+import path from 'node:path';
+import { DATA_DIR } from '../db/paths.js';
 
 const SECRET_KEY = '4ec7a301e184f0739f94a9759944a75f6e017af8047f1dcd0c988e132e1ef6d4';
 
@@ -21,13 +22,15 @@ export function validateKey(machineId, key) {
 }
 
 export function readStoredKey() {
+  const licensePath = process.env.STORE_LICENSE_PATH || path.join(DATA_DIR, 'license.key');
   try {
-    return fs.readFileSync(LICENSE_PATH, 'utf8').trim();
+    return fs.readFileSync(licensePath, 'utf8').trim();
   } catch {
     return null;
   }
 }
 
 export function writeKey(key) {
-  fs.writeFileSync(LICENSE_PATH, key, 'utf8');
+  const licensePath = process.env.STORE_LICENSE_PATH || path.join(DATA_DIR, 'license.key');
+  fs.writeFileSync(licensePath, key, 'utf8');
 }
