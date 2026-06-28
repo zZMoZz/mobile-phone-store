@@ -15,7 +15,9 @@
     "build": "npm --prefix client install && npm --prefix client run build",
     "start": "node server/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "reset-admin": "node server/scripts/reset-admin.js",
+    "license": "node server/scripts/generate-license.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
