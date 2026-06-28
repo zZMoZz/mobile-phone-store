@@ -1,11 +1,11 @@
-# SDD Progress Ledger — Transaction Void Feature
+# SDD Progress Ledger — Machine Licensing
 
 Branch: main
-Merge base: 8ddb9450acea5d70b1aabd0770cec9bddd06e2ea
-Plan: docs/superpowers/plans/2026-06-26-transaction-void.md
-Task 1: complete (commits 8ddb945..9962c39, review clean)
-Task 2: complete (commits 9962c39..9a1adda, review clean — pre-existing i18n changes correctly swept in; PRESETS verified: admin spreads CAPABILITIES dynamically, staff unchanged)
-Task 3: complete (commits 9a1adda..ec79ce1, review clean — pre-existing uncommitted transactions.js changes swept in; 5 pre-existing non-void test failures confirmed pre-date this plan via 8ddb945 baseline check)
-Task 4: complete (commits ec79ce1..aa94766, review clean)
-Task 5: complete (commits aa94766..597c84e, review clean — minor: Tooltip skipped (title attr used instead, fine); pre-existing UX changes swept in)
-Final review fixes: complete (commits 597c84e..f8bbaf0, review clean — fixed listByProduct/historyByProduct voided filter, optimistic row removal, modal error clear)
+Merge base: 94873c0
+Plan: docs/superpowers/plans/2026-06-28-machine-licensing.md
+Task 1: complete (commits 94873c0..da18724, review clean)
+Task 2: complete (commits da18724..7d9d2e5, review clean — minor: LICENSE_PATH captured at module-load time; test writes to real data/license.key but key is for mock machine ID, no security risk)
+Task 3: complete (commits 7d9d2e5..1fc6e4d, review clean — minor: machineId interpolated unescaped into HTML, safe in practice as Windows MachineGuid is always a UUID)
+Task 4: complete (commits 1fc6e4d..6363cb6, review clean)
+Task 5: complete (commits 6363cb6..69f4f9e, review clean)
+Fix: complete (commit 55c555b — LICENSE_PATH resolved at call time; final review clean)
