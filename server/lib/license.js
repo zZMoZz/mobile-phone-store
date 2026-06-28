@@ -3,19 +3,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR } from '../db/paths.js';
 
-const SECRET_KEY = '4ec7a301e184f0739f94a9759944a75f6e017af8047f1dcd0c988e132e1ef6d4';
+// Public key — verifies licenses but cannot generate them.
+// The matching private key lives only on the developer's machine.
+const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUvc6KykxSv6K9I6xGE24tNoleuIN
+uimblvapZpxU30Hyeqk/gzTDuIzRNz9+7XpMlQNvsi9M1AbJs8ARhELtGw==
+-----END PUBLIC KEY-----`;
 
-export function generateKey(machineId) {
-  return crypto.createHmac('sha256', SECRET_KEY).update(machineId).digest('hex');
+export function generateKey(machineId, privateKey) {
+  const sign = crypto.createSign('SHA256');
+  sign.update(machineId);
+  return sign.sign(privateKey, 'base64');
 }
 
-export function validateKey(machineId, key) {
-  if (!key || typeof key !== 'string' || key.length !== 64) return false;
+export function validateKey(machineId, licenseKey, publicKey) {
+  if (!licenseKey || typeof licenseKey !== 'string') return false;
   try {
-    const expected = Buffer.from(generateKey(machineId), 'hex');
-    const provided = Buffer.from(key.toLowerCase(), 'hex');
-    if (expected.length !== provided.length) return false;
-    return crypto.timingSafeEqual(expected, provided);
+    const pubKey = publicKey || process.env.LICENSE_PUBLIC_KEY || PUBLIC_KEY;
+    const verify = crypto.createVerify('SHA256');
+    verify.update(machineId);
+    return verify.verify(pubKey, licenseKey, 'base64');
   } catch {
     return false;
   }
