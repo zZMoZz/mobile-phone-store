@@ -4,12 +4,13 @@ import { seed } from './seed.js';
 import * as productsRepo from '../repositories/products.js';
 import * as txnRepo from '../repositories/transactions.js';
 
-// Returns a SQL datetime string `n` days ago (UTC, matches datetime('now')).
+// Returns a SQL datetime string `n` days ago in local time, matching datetime('now', 'localtime').
 function daysAgo(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   d.setHours(10 + Math.floor(Math.random() * 8), Math.floor(Math.random() * 59), 0, 0);
-  return d.toISOString().slice(0, 19).replace('T', ' ');
+  const pad = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }
 
 const PRODUCTS = [

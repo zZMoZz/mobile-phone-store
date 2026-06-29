@@ -97,7 +97,7 @@ export function voidTransaction(id, userId) {
     throw err;
   }
 
-  const { age } = db.prepare("SELECT unixepoch('now') - unixepoch(?) AS age").get(txn.created_at);
+  const { age } = db.prepare("SELECT unixepoch('now') - unixepoch(?, 'utc') AS age").get(txn.created_at);
   if (age > 300) {
     const err = new Error('Void window expired');
     err.status = 403;
@@ -129,7 +129,7 @@ export function voidTransaction(id, userId) {
 
   db.transaction(() => {
     db.prepare(
-      "UPDATE transactions SET voided_at = datetime('now'), voided_by_id = ? WHERE id = ?",
+      "UPDATE transactions SET voided_at = datetime('now', 'localtime'), voided_by_id = ? WHERE id = ?",
     ).run(userId, id);
 
     for (const item of items) {
@@ -230,7 +230,7 @@ export function list(query = {}) {
   const rows = getDb()
     .prepare(
       `SELECT *,
-        CASE WHEN voided_at IS NULL AND unixepoch('now') - unixepoch(created_at) <= 300 THEN 1 ELSE 0 END AS voidable
+        CASE WHEN voided_at IS NULL AND unixepoch('now') - unixepoch(created_at, 'utc') <= 300 THEN 1 ELSE 0 END AS voidable
        FROM transactions ${whereSql} ORDER BY ${orderSql} LIMIT @limit OFFSET @offset`,
     )
     .all({ ...params, limit: pageSize, offset });

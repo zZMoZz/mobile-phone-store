@@ -31,7 +31,9 @@ export default function Dashboard() {
     if (period === 'year') {
       const d = new Date();
       d.setFullYear(d.getFullYear() - 1);
-      return { from: d.toISOString().slice(0, 19).replace('T', ' '), granularity: 'month' };
+      const pad = (n) => String(n).padStart(2, '0');
+      const from = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+      return { from, granularity: 'month' };
     }
     return { granularity: 'month' };
   }, [period]);

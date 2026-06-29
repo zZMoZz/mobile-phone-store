@@ -224,6 +224,29 @@ function applyColumnMigrations(db) {
     db.exec('PRAGMA foreign_keys = ON');
   }
 
+  // Convert existing UTC timestamps to local time.
+  // All date columns were stored as UTC via datetime('now'); we now use
+  // datetime('now', 'localtime'). Apply the server's UTC offset once so
+  // existing records display at the correct local time.
+  const settingsCols2 = columns('settings');
+  if (!settingsCols2.includes('localtime_migrated')) {
+    db.exec('ALTER TABLE settings ADD COLUMN localtime_migrated INTEGER NOT NULL DEFAULT 0');
+  }
+  const migrationRow = db.prepare('SELECT localtime_migrated FROM settings WHERE id = 1').get();
+  if (migrationRow && migrationRow.localtime_migrated === 0) {
+    const offsetHours = -new Date().getTimezoneOffset() / 60;
+    if (offsetHours !== 0) {
+      const sign = offsetHours >= 0 ? '+' : '';
+      const mod = `'${sign}${offsetHours} hours'`;
+      db.exec(`UPDATE products SET created_at = datetime(created_at, ${mod}), updated_at = datetime(updated_at, ${mod})`);
+      db.exec(`UPDATE transactions SET created_at = datetime(created_at, ${mod}),
+        voided_at = CASE WHEN voided_at IS NOT NULL THEN datetime(voided_at, ${mod}) ELSE NULL END`);
+      db.exec(`UPDATE users SET created_at = datetime(created_at, ${mod})`);
+      db.exec(`UPDATE activity_logs SET created_at = datetime(created_at, ${mod})`);
+    }
+    db.exec('UPDATE settings SET localtime_migrated = 1 WHERE id = 1');
+  }
+
   // Ensure at least one owner exists. Pre-auth-overhaul DBs had all users as
   // 'admin'; the recreation above preserves that role, leaving no owner.
   // Promote the oldest admin to owner so the permission matrix works correctly.

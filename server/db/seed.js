@@ -68,8 +68,8 @@ export function seed() {
   const hasSettings = db.prepare('SELECT COUNT(*) AS c FROM settings').get().c;
   if (!hasSettings) {
     db.prepare(
-      `INSERT INTO settings (id, currency, default_language, default_theme, store_name_en, store_name_ar, low_stock_threshold)
-       VALUES (1, 'EGP', 'ar', 'light', 'Silver Store', 'متجر سيلفر', 3)`,
+      `INSERT INTO settings (id, currency, default_language, default_theme, store_name_en, store_name_ar, low_stock_threshold, localtime_migrated)
+       VALUES (1, 'EGP', 'ar', 'light', 'Silver Store', 'متجر سيلفر', 3, 1)`,
     ).run();
   }
 

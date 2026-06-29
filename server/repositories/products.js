@@ -20,7 +20,7 @@ const SELECT_WITH_NAMES = `
 `;
 
 function touch(id) {
-  getDb().prepare("UPDATE products SET updated_at = datetime('now') WHERE id = ?").run(id);
+  getDb().prepare("UPDATE products SET updated_at = datetime('now', 'localtime') WHERE id = ?").run(id);
 }
 
 export function getById(id) {
@@ -153,7 +153,7 @@ export function update(id, data) {
     }
   }
   if (fields.length) {
-    fields.push("updated_at = datetime('now')");
+    fields.push("updated_at = datetime('now', 'localtime')");
     getDb().prepare(`UPDATE products SET ${fields.join(', ')} WHERE id = @id`).run(params);
   }
   return getById(id);
@@ -215,7 +215,7 @@ export function setReferences(ids, { category_id, brand_id } = {}) {
     base.brand_id = brand_id ?? null;
   }
   if (list.length === 0 || sets.length === 0) return 0;
-  sets.push("updated_at = datetime('now')");
+  sets.push("updated_at = datetime('now', 'localtime')");
   const stmt = getDb().prepare(`UPDATE products SET ${sets.join(', ')} WHERE id = @id`);
   const run = getDb().transaction((rows) => {
     let n = 0;
@@ -231,7 +231,7 @@ export function setReferences(ids, { category_id, brand_id } = {}) {
  */
 export function adjustQuantity(id, delta) {
   getDb()
-    .prepare('UPDATE products SET quantity = quantity + ?, updated_at = datetime(\'now\') WHERE id = ?')
+    .prepare("UPDATE products SET quantity = quantity + ?, updated_at = datetime('now', 'localtime') WHERE id = ?")
     .run(delta, id);
   return getById(id);
 }

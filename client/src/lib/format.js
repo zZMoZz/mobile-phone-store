@@ -42,8 +42,15 @@ export function formatMoney(amount, lang = 'ar', { noCents = false } = {}) {
   return lang === 'ar' ? `${formatted} ${label}` : `${label} ${formatted}`;
 }
 
+const pad = (n) => String(n).padStart(2, '0');
+
+/** Formats a Date as a local 'YYYY-MM-DD HH:MM:SS' string (no UTC conversion). */
+function toLocalSql(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 /**
- * Returns a SQL-comparable 'YYYY-MM-DD HH:MM:SS' UTC start time for a named
+ * Returns a SQL-comparable 'YYYY-MM-DD HH:MM:SS' local start time for a named
  * period ('today' | 'week' | 'month'), or undefined for 'all'.
  */
 export function periodStart(period) {
@@ -58,13 +65,14 @@ export function periodStart(period) {
     d.setMonth(now.getMonth() - 1);
     d.setHours(0, 0, 0, 0);
   }
-  return d.toISOString().slice(0, 19).replace('T', ' ');
+  return toLocalSql(d);
 }
 
-/** Formats an ISO/SQL datetime string for display. */
+/** Formats a local SQL datetime string ('YYYY-MM-DD HH:MM:SS') for display. */
 export function formatDate(value, lang = 'ar') {
   if (!value) return '';
-  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T') + 'Z');
+  // Stored as local time — parse without 'Z' so the browser does not apply a UTC offset.
+  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
   return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',

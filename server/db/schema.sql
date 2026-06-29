@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS products (
   quantity      INTEGER NOT NULL DEFAULT 0,
   barcode       TEXT UNIQUE,                   -- nullable; unique when present
   is_temporary  INTEGER NOT NULL DEFAULT 0,    -- 1 = quick-added during a sale
-  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   profit          REAL NOT NULL DEFAULT 0,     -- total - cost_total (sale/service)
   user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
   username_snapshot TEXT,
-  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   voided_at       TEXT DEFAULT NULL,
   voided_by_id    INTEGER REFERENCES users(id) DEFAULT NULL
 );
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS users (
   token_version         INTEGER NOT NULL DEFAULT 0,
   recovery_code_hash    TEXT,
   permissions           TEXT NOT NULL DEFAULT '[]',  -- JSON array of capability keys (owner = implicit all)
-  created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at            TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS activity_logs (
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   entity     TEXT,
   entity_id  INTEGER,
   detail     TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at);

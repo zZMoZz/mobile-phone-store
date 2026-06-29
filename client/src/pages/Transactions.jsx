@@ -67,15 +67,19 @@ function itemSummary(items = []) {
   return `${names.slice(0, MAX_SHOWN).join(', ')} +${names.length - MAX_SHOWN}`;
 }
 
+function localDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function quickRange(preset) {
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = localDate(now);
   if (preset === 'today') return { from: today, to: today };
   if (preset === 'week') {
     const daysSinceSat = (now.getDay() + 1) % 7;
     const sat = new Date(now);
     sat.setDate(now.getDate() - daysSinceSat);
-    return { from: sat.toISOString().slice(0, 10), to: today };
+    return { from: localDate(sat), to: today };
   }
   if (preset === 'month') {
     const m = String(now.getMonth() + 1).padStart(2, '0');
