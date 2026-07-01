@@ -52,8 +52,8 @@ describe('analytics, settings, and data export', () => {
     await api
       .post('/api/products')
       .send({ name: 'Almost Out', quantity: 1, selling_price: 5, buying_price: 3, category_id: 1, brand_id: 1 });
-    const res = await api.get('/api/analytics');
-    expect(res.body.lowStock.some((p) => p.name === 'Almost Out')).toBe(true);
+    const res = await api.get('/api/analytics/low-stock');
+    expect(res.body.items.some((p) => p.name === 'Almost Out')).toBe(true);
   });
 
   it('creates a backup', async () => {

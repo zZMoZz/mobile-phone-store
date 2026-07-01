@@ -28,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 import ProductSearchInput from '../components/ProductSearchInput.jsx';
 import { lookupByBarcode, searchProducts } from '../api/products.js';
 import { listTransactions, getTransaction, createTransaction } from '../api/transactions.js';
-import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
+import { formatMoney, formatDate, formatNumber, localDateToUtcFrom, localDateToUtcTo } from '../lib/format.js';
 import ServiceRecorder from '../components/ServiceRecorder.jsx';
 import ExpenseRecorder from '../components/ExpenseRecorder.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -49,16 +49,20 @@ function itemSummary(items = []) {
   return `${names.slice(0, MAX_SHOWN).join(', ')} +${names.length - MAX_SHOWN}`;
 }
 
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function quickRange(preset) {
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = localDateStr(now);
   if (preset === 'today') return { from: today, to: today };
   if (preset === 'week') {
     // Week starts on Saturday (getDay: 0=Sun, 6=Sat)
     const daysSinceSat = (now.getDay() + 1) % 7;
     const sat = new Date(now);
     sat.setDate(now.getDate() - daysSinceSat);
-    return { from: sat.toISOString().slice(0, 10), to: today };
+    return { from: localDateStr(sat), to: today };
   }
   if (preset === 'month') {
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -209,8 +213,8 @@ export default function NewTransaction() {
     if (!salePickerOpened) return;
     listTransactions({
       type: 'sale',
-      from: saleFrom || undefined,
-      to: saleTo ? `${saleTo} 23:59:59` : undefined,
+      from: localDateToUtcFrom(saleFrom),
+      to: localDateToUtcTo(saleTo),
       page: salePage,
       pageSize: 10,
     }).then(setSalePickerData).catch(() => {});

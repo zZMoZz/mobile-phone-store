@@ -27,11 +27,20 @@ import { listTransactions, getTransaction, voidTransaction } from '../api/transa
 import { listUsers } from '../api/users.js';
 import { listServices } from '../api/services.js';
 import { listOptionLists } from '../api/optionLists.js';
-import { formatMoney, formatDate, formatNumber } from '../lib/format.js';
+import { formatMoney, formatDate, formatNumber, localDateToUtcFrom, localDateToUtcTo } from '../lib/format.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 20;
 const MAX_SHOWN = 2;
+
+function buildHourOptions(lang) {
+  const am = lang === 'ar' ? 'صباحاً' : 'AM';
+  const pm = lang === 'ar' ? 'مساءاً' : 'PM';
+  return Array.from({ length: 24 }, (_, h) => ({
+    value: String(h).padStart(2, '0'),
+    label: h === 0 ? `12 ${am}` : h < 12 ? `${h} ${am}` : h === 12 ? `12 ${pm}` : `${h - 12} ${pm}`,
+  }));
+}
 
 function SummaryCard({ label, value, color }) {
   return (
@@ -67,15 +76,19 @@ function itemSummary(items = []) {
   return `${names.slice(0, MAX_SHOWN).join(', ')} +${names.length - MAX_SHOWN}`;
 }
 
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function quickRange(preset) {
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = localDateStr(now);
   if (preset === 'today') return { from: today, to: today };
   if (preset === 'week') {
     const daysSinceSat = (now.getDay() + 1) % 7;
     const sat = new Date(now);
     sat.setDate(now.getDate() - daysSinceSat);
-    return { from: sat.toISOString().slice(0, 10), to: today };
+    return { from: localDateStr(sat), to: today };
   }
   if (preset === 'month') {
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -90,6 +103,7 @@ function quickRange(preset) {
 export default function Transactions() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
+  const hourOptions = useMemo(() => buildHourOptions(lang), [lang]);
   const { can } = useAuth();
   const canSeeOthers = can('see.others_transactions');
   const showCost = can('see.cost');
@@ -105,6 +119,8 @@ export default function Transactions() {
   const [sortDir, setSortDir] = useState('desc');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [fromTime, setFromTime] = useState('');
+  const [toTime, setToTime] = useState('');
   const [quickPeriod, setQuickPeriod] = useState(null);
   const [page, setPage] = useState(1);
   const [historyData, setHistoryData] = useState({ items: [], total: 0 });
@@ -134,21 +150,26 @@ export default function Transactions() {
   }, []);
 
   const historyQuery = useMemo(
-    () => ({
-      types: filterTypes.length > 0 ? filterTypes.join(',') : undefined,
-      username: filterUser || undefined,
-      service_id: filterServiceId || undefined,
-      direction: filterDirection || undefined,
-      product: filterProduct || undefined,
-      txn_id: filterId || undefined,
-      sort: sortField,
-      order: sortDir,
-      from: from || undefined,
-      to: to ? `${to} 23:59:59` : undefined,
-      page,
-      pageSize: PAGE_SIZE,
-    }),
-    [filterTypes, filterUser, filterServiceId, filterDirection, filterProduct, filterId, sortField, sortDir, from, to, page, refreshKey],
+    () => {
+      const todayStr = localDateStr(new Date());
+      const effectiveFrom = from || (fromTime ? todayStr : '');
+      const effectiveTo   = to   || (toTime   ? todayStr : '');
+      return {
+        types: filterTypes.length > 0 ? filterTypes.join(',') : undefined,
+        username: filterUser || undefined,
+        service_id: filterServiceId || undefined,
+        direction: filterDirection || undefined,
+        product: filterProduct || undefined,
+        txn_id: filterId || undefined,
+        sort: sortField,
+        order: sortDir,
+        from: localDateToUtcFrom(effectiveFrom, fromTime ? `${fromTime}:00` : ''),
+        to: localDateToUtcTo(effectiveTo, toTime ? `${String(Math.max(0, Number(toTime) - 1)).padStart(2, '0')}:59` : ''),
+        page,
+        pageSize: PAGE_SIZE,
+      };
+    },
+    [filterTypes, filterUser, filterServiceId, filterDirection, filterProduct, filterId, sortField, sortDir, from, to, fromTime, toTime, page, refreshKey],
   );
 
   useEffect(() => {
@@ -157,12 +178,14 @@ export default function Transactions() {
 
   useEffect(() => {
     setPage(1);
-  }, [filterTypes, filterUser, filterServiceId, filterDirection, filterProduct, filterId, sortField, sortDir, from, to]);
+  }, [filterTypes, filterUser, filterServiceId, filterDirection, filterProduct, filterId, sortField, sortDir, from, to, fromTime, toTime]);
 
   const applyQuickPeriod = (preset) => {
     const { from: f, to: tt } = quickRange(preset);
     setFrom(f);
     setTo(tt);
+    setFromTime('');
+    setToTime('');
     setQuickPeriod(preset);
   };
 
@@ -177,6 +200,8 @@ export default function Transactions() {
     setSortDir('desc');
     setFrom('');
     setTo('');
+    setFromTime('');
+    setToTime('');
     setQuickPeriod(null);
   };
 
@@ -317,6 +342,16 @@ export default function Transactions() {
               onChange={(e) => { setFrom(e.currentTarget.value); setQuickPeriod(null); }}
               style={{ flex: 1 }}
             />
+            <Select
+              size="sm"
+              label={t('txns.fromTime')}
+              placeholder="—"
+              data={hourOptions}
+              value={fromTime}
+              onChange={(v) => { setFromTime(v || ''); setQuickPeriod(null); }}
+              clearable
+              w={110}
+            />
             <TextInput
               size="sm"
               label={t('txns.to')}
@@ -324,6 +359,16 @@ export default function Transactions() {
               value={to}
               onChange={(e) => { setTo(e.currentTarget.value); setQuickPeriod(null); }}
               style={{ flex: 1 }}
+            />
+            <Select
+              size="sm"
+              label={t('txns.toTime')}
+              placeholder="—"
+              data={hourOptions}
+              value={toTime}
+              onChange={(v) => { setToTime(v || ''); setQuickPeriod(null); }}
+              clearable
+              w={110}
             />
           </Group>
 

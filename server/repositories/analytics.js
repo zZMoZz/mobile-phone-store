@@ -116,15 +116,26 @@ export function overview(query = {}) {
     )
     .all(params);
 
-  // Low stock (not date-scoped — reflects current inventory).
   const threshold = getSettings()?.low_stock_threshold ?? 3;
-  const lowStock = db
+  const lowStockTotal = db
+    .prepare(`SELECT COUNT(*) AS c FROM products WHERE quantity <= ? AND is_temporary = 0`)
+    .get(threshold).c;
+
+  return { totals, trend, topProducts, topBuyingProducts, topReturningProducts, topServices, lowStockTotal, lowStockThreshold: threshold };
+}
+
+export function lowStockList({ page = 1, pageSize = 10 } = {}) {
+  const db = getDb();
+  const threshold = getSettings()?.low_stock_threshold ?? 3;
+  const total = db
+    .prepare(`SELECT COUNT(*) AS c FROM products WHERE quantity <= ? AND is_temporary = 0`)
+    .get(threshold).c;
+  const items = db
     .prepare(
       `SELECT id, name, quantity FROM products
        WHERE quantity <= ? AND is_temporary = 0
-       ORDER BY quantity ASC LIMIT 20`,
+       ORDER BY quantity ASC LIMIT ? OFFSET ?`,
     )
-    .all(threshold);
-
-  return { totals, trend, topProducts, topBuyingProducts, topReturningProducts, topServices, lowStock, lowStockThreshold: threshold };
+    .all(threshold, pageSize, (page - 1) * pageSize);
+  return { items, total, threshold };
 }

@@ -12,10 +12,13 @@ import {
   Table,
   Center,
   Loader,
+  Pagination,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { getAnalytics } from '../api/analytics.js';
+import { getAnalytics, getLowStock } from '../api/analytics.js';
 import { formatMoney, formatNumber, periodStart } from '../lib/format.js';
+
+const LOW_STOCK_PAGE_SIZE = 10;
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
@@ -24,6 +27,8 @@ export default function Dashboard() {
   const [period, setPeriod] = useState('month');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lowStockPage, setLowStockPage] = useState(1);
+  const [lowStockData, setLowStockData] = useState({ items: [], total: 0, threshold: 3 });
 
   const params = useMemo(() => {
     if (period === 'week') return { from: periodStart('week'), granularity: 'day' };
@@ -42,6 +47,12 @@ export default function Dashboard() {
       .then(setData)
       .finally(() => setLoading(false));
   }, [params]);
+
+  useEffect(() => {
+    getLowStock({ page: lowStockPage, pageSize: LOW_STOCK_PAGE_SIZE })
+      .then(setLowStockData)
+      .catch(() => {});
+  }, [lowStockPage]);
 
   return (
     <Stack>
@@ -70,30 +81,42 @@ export default function Dashboard() {
               <Group justify="space-between" mb="sm">
                 <Text fw={600}>{t('dashboard.lowStock')}</Text>
                 <Badge color="red" variant="light">
-                  ≤ {data.lowStockThreshold}
+                  ≤ {lowStockData.threshold}
                 </Badge>
               </Group>
-              {data.lowStock.length === 0 ? (
+              {lowStockData.items.length === 0 ? (
                 <Text c="dimmed">{t('dashboard.lowStockEmpty')}</Text>
               ) : (
-                <Table>
-                  <Table.Tbody>
-                    {data.lowStock.map((p) => (
-                      <Table.Tr
-                        key={p.id}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => navigate(`/inventory/${p.id}`)}
-                      >
-                        <Table.Td>{p.name}</Table.Td>
-                        <Table.Td style={{ textAlign: 'end' }}>
-                          <Badge color={p.quantity > 0 ? 'orange' : 'red'} variant="light" size="lg">
-                            {formatNumber(p.quantity, lang)}
-                          </Badge>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
+                <Stack gap="xs">
+                  <Table>
+                    <Table.Tbody>
+                      {lowStockData.items.map((p) => (
+                        <Table.Tr
+                          key={p.id}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => navigate(`/inventory/${p.id}`)}
+                        >
+                          <Table.Td>{p.name}</Table.Td>
+                          <Table.Td style={{ textAlign: 'end' }}>
+                            <Badge color={p.quantity > 0 ? 'orange' : 'red'} variant="light" size="lg">
+                              {formatNumber(p.quantity, lang)}
+                            </Badge>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                  {lowStockData.total > LOW_STOCK_PAGE_SIZE && (
+                    <Center>
+                      <Pagination
+                        size="xs"
+                        value={lowStockPage}
+                        onChange={setLowStockPage}
+                        total={Math.ceil(lowStockData.total / LOW_STOCK_PAGE_SIZE)}
+                      />
+                    </Center>
+                  )}
+                </Stack>
               )}
             </Paper>
 

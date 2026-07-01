@@ -16,7 +16,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { listActivityLogs } from '../api/activityLogs.js';
 import { listUserNames } from '../api/users.js';
-import { formatDate } from '../lib/format.js';
+import { formatDate, localDateToUtcFrom, localDateToUtcTo } from '../lib/format.js';
 
 const PAGE_SIZE = 50;
 
@@ -117,8 +117,8 @@ export default function ActivityLog() {
 
   useEffect(() => {
     const params = { page, pageSize: PAGE_SIZE };
-    if (from) params.from = from;
-    if (to) params.to = to;
+    if (from) params.from = localDateToUtcFrom(from);
+    if (to) params.to = localDateToUtcTo(to);
     if (action) params.action = action;
     if (userId) params.userId = userId;
     listActivityLogs(params).then(setData).catch(() => {});

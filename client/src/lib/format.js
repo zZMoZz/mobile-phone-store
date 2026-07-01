@@ -61,6 +61,24 @@ export function periodStart(period) {
   return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/**
+ * Converts a local date string (YYYY-MM-DD) to a UTC 'YYYY-MM-DD HH:MM:SS' suitable
+ * for >= comparison against UTC-stored datetimes in SQLite. 'T00:00:00' without a
+ * timezone suffix is parsed as local time by the JS Date constructor.
+ * Optional `time` (HH:MM) overrides the default start-of-day midnight.
+ */
+export function localDateToUtcFrom(date, time = '') {
+  if (!date) return undefined;
+  return new Date(`${date}T${time || '00:00'}:00`).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/** Same as localDateToUtcFrom but for the end boundary (<= comparison).
+ *  Optional `time` (HH:MM) overrides the default end-of-day 23:59:59. */
+export function localDateToUtcTo(date, time = '') {
+  if (!date) return undefined;
+  return new Date(`${date}T${time || '23:59'}:59`).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 /** Formats an ISO/SQL datetime string for display. */
 export function formatDate(value, lang = 'ar') {
   if (!value) return '';
